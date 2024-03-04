@@ -126,7 +126,7 @@ def main(cfg: dict):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pose estimation")
-    parser.add_argument("--cfg_path", type=str, default="degree_project/src/config/pose_extraction_config.yaml", help="Path to config file")
+    parser.add_argument("--cfg_path", type=str, default="degree_project/config/pose_extraction_config.yaml", help="Path to config file")
     args = parser.parse_args()
 
     cfg = OmegaConf.load(args.cfg_path)
