@@ -1,0 +1,7 @@
+MODEL:
+    PATH: 'degree_project/model/pose_estimation/body_pose_model.pth'
+    LOAD_FINETUNED_WEIGHTS: False
+    FINE_TUNED_WEIGHTS_PATH: 'degree_project/model/pose_estimation/model.h5'
+POSE_ESTIMATION:
+    VIDEO_FOLDER: /Midgard/Data/tibbe/datasets/own/
+    OUTPUT_FOLDER: degree_project/output/pose_estimation
