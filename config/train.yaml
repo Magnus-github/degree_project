@@ -1,0 +1,23 @@
+model:
+    name: model:STTransformer
+    in_features: distance_mat # options: [distance_mat, kinematics(pos, vel, acc, depth)]
+    in_params:
+        test: 123
+optimizer:
+    name: Adam
+    in_params:
+        lr: 0.001
+        weight_decay: 0.0001
+scheduler:
+    name: StepLR
+    in_params:
+        step_size: 10
+        gamma: 0.1
+loss:
+data:
+    name: data:KIDataset
+    fps: 25
+    in_params:
+        test: 12
+hparams:
+    epochs: 100
