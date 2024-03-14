@@ -149,6 +149,16 @@ def smooth_joint_trajectories_from_array(joint_trajectories: np.array):
         mean_confidence = np.mean(joint_trajectories[:, joint, 2], axis=0)
 
         smooth_idx = np.where(joint_trajectories[:, joint, 2] > mean_confidence - 0.1)[0]
+        if smooth_idx[0] > 10:
+            smooth_idx = np.concatenate((np.array([0]), smooth_idx))
+        if smooth_idx[-1] < num_frames - 10:
+            smooth_idx = np.append(smooth_idx, num_frames - 1)
+
+        # # if there is a gap somewhere, add an index in the middle of the gap
+        # for i in range(len(smooth_idx) - 1):
+        #     if smooth_idx[i+1] - smooth_idx[i] > 20:
+        #         smooth_idx = np.append(smooth_idx, (smooth_idx[i+1] + smooth_idx[i]) // 2)
+
 
         int_x = CubicSpline(smooth_idx, joint_trajectories[smooth_idx, joint, 0], bc_type='natural')(range(len(joint_trajectories)))
         smoothed_x = savgol_filter(int_x, 5, 3)
@@ -205,17 +215,19 @@ def smoothing_from_df(cfg: dict):
             # smooth joint trajectories
             smoothed_joint_trajectories = smooth_joint_trajectories_from_array(joint_trajectories)
 
+            # normalize joint trajectories
+            
 
-            # TODO: properly save smoothed joint trajectories to dataframe
-            # data.update({"joint_trajectories": joint_trajectories})
-            # data.update({"smoothed_joint_trajectories": smoothed_joint_trajectories})
+            data["smoothed_joint_trajectories"] = smoothed_joint_trajectories.tolist()
+            data["joint_trajectories"] = joint_trajectories.tolist()
 
             # save updated dataframe
             out_path = os.path.join(cfg.POSES.SMOOTH_OUT_PATH, pose_file)
             with open(out_path, 'wb') as f:
-                pickle.dump(smoothed_joint_trajectories, f)
+                pickle.dump(data, f)
 
             print(f"Saved smoothed joint trajectories to {out_path}")
+            
 
 def main(cfg: dict):
 
@@ -225,9 +237,7 @@ def main(cfg: dict):
     elif mode == "from_df":
         smoothing_from_df(cfg)
     else:
-        print("Invalid mode. Use 'from_dict' or 'from_df'.")
-
-    
+        print("Invalid mode. Use 'from_dict' or 'from_df'.")    
     
 
     # # display joint trajectories
