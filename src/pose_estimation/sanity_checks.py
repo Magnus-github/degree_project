@@ -35,7 +35,7 @@ def main():
     for file in os.listdir(pose_directory):
         if file.endswith(".pkl"):
             df_path = os.path.join(pose_directory, file)
-            # df_path = pose_directory + "ID_0100_0.pkl"
+            df_path = pose_directory + "ID_0100_0.pkl"
 
             with open(df_path, 'rb') as f:
                 data = pickle.load(f)
@@ -51,9 +51,10 @@ def main():
                 i+=1
 
             ID = '_'.join(file.split('_')[1:3])
-            # ID = '0100_0'
+            ID = '0100_0'
             plot_pose_sequences(pose_sequence, smoothed_pose_sequence, out_folder, ID)
 
+        break
         
 
 

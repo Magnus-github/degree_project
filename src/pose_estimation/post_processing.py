@@ -199,6 +199,56 @@ def smoothing_from_dict(cfg: dict):
             print(f"Saved smoothed joint trajectories to {out_path}")
 
 
+def rotate_relative(joints, center, angle):
+    x = joints[:, :, 0] - center[0]
+    y = joints[:, :, 1] - center[1]
+    joints[:, :, 0] = x * np.cos(angle) - y * np.sin(angle) + center[0]
+    joints[:, :, 1] = x * np.sin(angle) + y * np.cos(angle) + center[1]
+    return joints
+
+def rotate_joint_trajectories(joint_trajectories: np.array):
+    # calculate angle of shoulders
+    ang_shoulder = np.arctan2(joint_trajectories[:, 5, 1] - joint_trajectories[:, 2, 1], joint_trajectories[:, 5, 0] - joint_trajectories[:, 2, 0])
+    ang_shoulder = np.mean(ang_shoulder)
+    # calculate angle of hips
+    ang_hips = np.arctan2(joint_trajectories[:, 11, 1] - joint_trajectories[:, 8, 1], joint_trajectories[:, 11, 0] - joint_trajectories[:, 8, 0])
+    ang_hips = np.mean(ang_hips)
+    # calculate center of body
+    center_shoulder = (joint_trajectories[:, 5, :2] + joint_trajectories[:, 2, :2]) / 2
+    center_shoulder = np.mean(center_shoulder, axis=0)
+    center_hips = (joint_trajectories[:, 11, :2] + joint_trajectories[:, 8, :2]) / 2
+    center_hips = np.mean(center_hips, axis=0)
+    center_body = (center_shoulder + center_hips) / 2
+
+
+    # rotate joints around center of body
+    # left arm:
+    joint_trajectories[:, 2:5, :2] = rotate_relative(joint_trajectories[:, 2:5, :2], center_body, ang_shoulder)
+    # right arm:
+    joint_trajectories[:, 5:8, :2] = rotate_relative(joint_trajectories[:, 5:8, :2], center_body, ang_shoulder)
+    # head:
+    joint_trajectories[:, 0:2, :2] = rotate_relative(joint_trajectories[:, 0:2, :2], center_body, ang_shoulder)
+    joint_trajectories[:, 14:18, :2] = rotate_relative(joint_trajectories[:, 14:18, :2], center_body, ang_shoulder)
+    # right leg:
+    joint_trajectories[:, 8:11, :2] = rotate_relative(joint_trajectories[:, 8:11, :2], center_body, ang_hips)
+    # left leg:
+    joint_trajectories[:, 11:14, :2] = rotate_relative(joint_trajectories[:, 11:14, :2], center_body, ang_hips)
+
+    return joint_trajectories
+    
+def normalize_joint_trajectories(joint_trajectories: np.array):
+    ref_joint = joint_trajectories[:, 1, :2]
+    ref_joint = np.mean(ref_joint, axis=0)
+    center_hips = (joint_trajectories[:, 11, :2] + joint_trajectories[:, 8, :2]) / 2
+    center_hips = np.mean(center_hips, axis=0)
+    ref_dist = np.linalg.norm(ref_joint - center_hips)
+
+    for i in range(18):
+        joint_trajectories[:, i, :2] = joint_trajectories[:, i, :2] - ref_joint
+        joint_trajectories[:, i, :2] = joint_trajectories[:, i, :2] / ref_dist
+
+    return joint_trajectories
+
 def smoothing_from_df(cfg: dict):
     # load pose dict
     pose__estim_out_folder = cfg.POSES.PATH
@@ -215,7 +265,11 @@ def smoothing_from_df(cfg: dict):
             # smooth joint trajectories
             smoothed_joint_trajectories = smooth_joint_trajectories_from_array(joint_trajectories)
 
+            # rotate joint trajectories
+            smoothed_joint_trajectories  = rotate_joint_trajectories(smoothed_joint_trajectories)
+
             # normalize joint trajectories
+            smoothed_joint_trajectories = normalize_joint_trajectories(smoothed_joint_trajectories)
             
 
             data["smoothed_joint_trajectories"] = smoothed_joint_trajectories.tolist()
@@ -227,6 +281,8 @@ def smoothing_from_df(cfg: dict):
                 pickle.dump(data, f)
 
             print(f"Saved smoothed joint trajectories to {out_path}")
+
+            break
             
 
 def main(cfg: dict):
