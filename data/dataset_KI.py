@@ -74,11 +74,11 @@ if __name__ == "__main__":
         abs_diff = torch.abs(pose_sequence_reshaped - pose_sequence_reshaped.permute(0, 1, 3, 2, 4))
 
         # Extract x and y distances
-        distance_x = abs_diff[:, :, :, :, 0]
-        distance_y = abs_diff[:, :, :, :, 1]
+        distance_x = abs_diff[:, :, :, :, 0].unsqueeze(4)
+        distance_y = abs_diff[:, :, :, :, 1].unsqueeze(4)
 
         # Concatenate distance tensors along dimension 3
-        features = torch.cat((distance_x, distance_y), dim=3)
+        features = torch.cat((distance_x, distance_y), dim=4)
         print(pose_sequence.shape, label)
         print(f"Time: {time.time() - t}")
         t = time.time()

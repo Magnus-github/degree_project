@@ -281,8 +281,6 @@ def smoothing_from_df(cfg: dict):
                 pickle.dump(data, f)
 
             print(f"Saved smoothed joint trajectories to {out_path}")
-
-            break
             
 
 def main(cfg: dict):
