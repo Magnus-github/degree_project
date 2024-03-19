@@ -6,7 +6,7 @@ POSE_ESTIMATION:
     VIDEO_FOLDER: /Midgard/Data/tibbe/datasets/own/
     OUTPUT_FOLDER: degree_project/output/pose_estimation
 POSES:
-    PATH: /Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed/
+    PATH: /Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed1/
     SMOOTH_OUT_PATH: /Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed_smooth/
 POST_PROCESS:
     MODE: 'from_df' # options: [from_dict, from_df]

@@ -6,6 +6,7 @@ from omegaconf import OmegaConf
 import os
 import logging
 import coloredlogs
+import wandb
 from tqdm import tqdm
 
 import sys
@@ -20,15 +21,17 @@ coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)
 
 
 class Trainer:
-    def __init__(self, cfg, dataloader):
+    def __init__(self, cfg, dataloaders):
         self._cfg = cfg
         self.model = str_to_class(cfg.model.name)(**cfg.model.in_params)
-        self.dataloader = dataloader
+        self.train_dataloader = dataloaders['train']
+        self.val_dataloader = dataloaders['val']
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.SGD(self.model.parameters(), **cfg.hparams.optimizer.params)
         self.scheduler = torch.optim.lr_scheduler.CyclicLR(self.optimizer, **cfg.hparams.scheduler.params)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model.to(self.device)
+        wandb.watch(self.model)
 
     def create_features(self, pose_sequence, name):
         if name == "distance_mat":
@@ -80,7 +83,7 @@ class Trainer:
         logger.info("Starting training...")
         for epoch in range(cfg.hparams.epochs):
             running_loss = 0.0
-            for i, (data, target) in enumerate(tqdm(self.dataloader)):
+            for i, (data, target) in enumerate(tqdm(self.train_dataloader)):
                 pose_sequence = data
                 label = self.one_hot_encode(target)
                 pose_sequence = pose_sequence.to(self.device)
@@ -95,19 +98,69 @@ class Trainer:
                 self.optimizer.step()
                 running_loss += loss.item()
 
-                logger.info(f"Epoch {epoch}, batch {i}, loss: {loss.item()}")
+                # logger.info(f"Epoch {epoch}, batch {i}, loss: {loss.item()}")
+                wandb.log({"Train Loss [batch]": loss.item()})
             
-            logger.info(f"Epoch {epoch} loss: {running_loss/len(self.dataloader)}")
+            logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
+            wandb.log({"Epoch": epoch,
+                       "Train Loss [epoch]": running_loss/len(self.train_dataloader)})
+            
             running_loss = 0.0
+
+            self.scheduler.step()
+
+            if (epoch+1) % 20 == 0 or epoch == 0:
+                self.validate()
+
+    def validate(self):
+        self.model.eval()
+        logger.info("Starting validation...")
+        correct = 0
+        total = 0
+        outputs = torch.zeros(len(self.val_dataloader), 3)
+        running_val_loss = 0.0
+        with torch.no_grad():
+            for i, (data, target) in enumerate(tqdm(self.val_dataloader)):
+                pose_sequence = data
+                label = self.one_hot_encode(target)
+                pose_sequence = pose_sequence.to(self.device)
+                label = label.to(self.device)
+
+                features = self.create_features(pose_sequence, self._cfg.model.in_features)
+                output = self.model(features)
+                outputs[i] = output
+                val_loss = self.criterion(output, label)
+                running_val_loss += val_loss.item()
+                _, predicted = torch.max(output.data, 1)
+                _, ground_truth = torch.max(label, 1)
+                total += label.size(0)
+                correct += (predicted == ground_truth).sum().item()
+
+        logger.info(f"Accuracy of the network on the {total} test sequences: {100 * correct / total}%")
+        logger.info(f"Validation loss: {running_val_loss/len(self.val_dataloader)}")
+        wandb.log({"val_accuracy": 100 * correct / total,
+                   "val_loss": running_val_loss/len(self.val_dataloader),
+                   "val_outputs": outputs})
+        
+        self.model.train()
 
 
 
 if __name__ == "__main__":
     cfg = OmegaConf.load("config/train.yaml")
 
-    dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params)
-    dataloader = DataLoader(dataset, batch_size=cfg.hparams.batch_size, shuffle=True)
+    train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train")
+    val_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="val")
 
-    trainer = Trainer(cfg, dataloader)
+    train_dataoader = DataLoader(train_dataset, batch_size=cfg.hparams.batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=cfg.hparams.batch_size, shuffle=True)
+
+    dataloaders = {"train": train_dataoader, "val": val_dataloader}
+
+    wandb.init(project='FM-classification', config=dict(cfg))
+
+    trainer = Trainer(cfg, dataloaders)
 
     trainer.train()
+
+    wandb.finish()

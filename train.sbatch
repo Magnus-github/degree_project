@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#SBATCH --mem  32GB
+#SBATCH --gres gpu:1
+#SBATCH --cpus-per-task 4
+#SBATCH --time 48:00:00
+#SBATCH --constrain "gondor"
+#SBATCH --mail-type FAIL
+#SBATCH --mail-user tibbe@kth.se
+#SBATCH --output /Midgard/home/%u/thesis/degree_project/logs/%J_slurm.out
+#SBATCH --error  /Midgard/home/%u/thesis/degree_project/logs/%J_slurm.err
+
+echo "Starting job ${SLURM_JOB_ID} on ${SLURMD_NODENAME}"
+nvidia-smi
+. ~/miniconda3/etc/profile.d/conda.sh
+conda activate openpose
+python src/FM_classification/trainer.py

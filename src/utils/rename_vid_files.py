@@ -10,7 +10,7 @@ def rename_vid_files(path, new_path):
         
         count = 0
         for f in os.listdir(new_path):
-            if id in f:
+            if id.zfill(4) in f:
                 count += 1
         new_name = "ID_{:04d}_{}.pkl".format(int(id), count)
 
@@ -22,6 +22,8 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, default="/Midgard/Data/tibbe/datasets/own/pose_sequences_openpose", help="Path to the directory with the video files")
     args = parser.parse_args()
 
-    new_path = new_path = "/".join(args.path.split("/")[:-1]) + "/pose_sequences_openpose_renamed/"
+    new_path = new_path = "/".join(args.path.split("/")[:-1]) + "/pose_sequences_openpose_renamed1/"
+    print(new_path)
+    print(args.path)
     os.makedirs(new_path, exist_ok=True)
     rename_vid_files(args.path, new_path)
