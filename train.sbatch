@@ -3,11 +3,11 @@
 #SBATCH --gres gpu:1
 #SBATCH --cpus-per-task 4
 #SBATCH --time 48:00:00
-#SBATCH --constrain "gondor"
+#SBATCH --constrain "balrog"
 #SBATCH --mail-type FAIL
 #SBATCH --mail-user tibbe@kth.se
-#SBATCH --output /Midgard/home/%u/thesis/degree_project/logs/%J_slurm.out
-#SBATCH --error  /Midgard/home/%u/thesis/degree_project/logs/%J_slurm.err
+#SBATCH --output /Midgard/home/%u/thesis/degree_project/slurmlogs/%J_slurm.out
+#SBATCH --error  /Midgard/home/%u/thesis/degree_project/slurmlogs/%J_slurm.err
 
 echo "Starting job ${SLURM_JOB_ID} on ${SLURMD_NODENAME}"
 nvidia-smi

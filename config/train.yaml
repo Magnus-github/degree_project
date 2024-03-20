@@ -13,9 +13,13 @@ dataset:
         data_folder: /Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed_smooth/
         annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
 hparams:
-    epochs: 200
+    epochs: 10
     batch_size: 1
-    criterion: CrossEntropyLoss
+    validation_period: 5
+    criterion: 
+        name: loss:WeightedCrossEntropyLoss
+        params:
+            weights: [0.879, 0.758, 0.363]
     optimizer:
         name: SGD
         params:

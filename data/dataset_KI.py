@@ -47,17 +47,21 @@ class KIDataset(Dataset):
         with open(os.path.join(self.data_folder, pose_file), 'rb') as file:
             data = pickle.load(file)
 
-        pose_sequence = (-1)*np.ones((len(data), 18, 3))
-        t = 0
-        for subset, candidate in zip(data["limbs_subset"].items(), data["limbs_candidate"].items()):
-            subset = subset[1]
-            candidate = candidate[1]
-            for j in range(len(subset)):
-                for i in range(18):
-                    index = int(subset[j][i])
-                    if index != -1:
-                        pose_sequence[t, i] = candidate[index, :3]
-            t += 1
+        # pose_sequence = (-1)*np.ones((len(data), 18, 3))
+        # t = 0
+        # for subset, candidate in zip(data["limbs_subset"].items(), data["limbs_candidate"].items()):
+        #     subset = subset[1]
+        #     candidate = candidate[1]
+        #     for j in range(len(subset)):
+        #         for i in range(18):
+        #             index = int(subset[j][i])
+        #             if index != -1:
+        #                 pose_sequence[t, i] = candidate[index, :3]
+        #     t += 1
+        # pose_sequence = torch.tensor(data["smoothed_joint_trajectories"])
+        pose_sequence = torch.zeros((len(data), 18, 3))
+        for i, frame in enumerate(data["smoothed_joint_trajectories"]):
+            pose_sequence[i] = torch.tensor(frame)
 
         id = int(pose_file.split("_")[1])
         label = self.labels[self.ids[id]]
@@ -65,7 +69,7 @@ class KIDataset(Dataset):
 
 
 if __name__ == "__main__":
-    data_folder = "/Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed/"
+    data_folder = "/Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed_smooth/"
     annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
     d = KIDataset(data_folder=data_folder, annotations_path=annotations_path)
 

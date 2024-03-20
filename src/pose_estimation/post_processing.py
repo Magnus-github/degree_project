@@ -253,7 +253,7 @@ def smoothing_from_df(cfg: dict):
     # load pose dict
     pose__estim_out_folder = cfg.POSES.PATH
 
-    for pose_file in os.listdir(pose__estim_out_folder):
+    for i, pose_file in enumerate(os.listdir(pose__estim_out_folder)):
         if pose_file.endswith('.pkl'):
             pose_file_path = os.path.join(pose__estim_out_folder, pose_file)
             with open(pose_file_path, 'rb') as f:
@@ -281,6 +281,7 @@ def smoothing_from_df(cfg: dict):
                 pickle.dump(data, f)
 
             print(f"Saved smoothed joint trajectories to {out_path}")
+            print(i)
             
 
 def main(cfg: dict):

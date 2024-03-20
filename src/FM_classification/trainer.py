@@ -12,7 +12,6 @@ from tqdm import tqdm
 import sys
 sys.path.append(os.curdir)
 
-from src.FM_classification.model import STTransformer
 from src.utils.str_to_class import str_to_class
 
 logger = logging.getLogger(__name__)
@@ -23,13 +22,13 @@ coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)
 class Trainer:
     def __init__(self, cfg, dataloaders):
         self._cfg = cfg
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = str_to_class(cfg.model.name)(**cfg.model.in_params)
         self.train_dataloader = dataloaders['train']
         self.val_dataloader = dataloaders['val']
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
         self.optimizer = torch.optim.SGD(self.model.parameters(), **cfg.hparams.optimizer.params)
         self.scheduler = torch.optim.lr_scheduler.CyclicLR(self.optimizer, **cfg.hparams.scheduler.params)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model.to(self.device)
         wandb.watch(self.model)
 
@@ -37,12 +36,13 @@ class Trainer:
         if name == "distance_mat":
             # Reshape pose_sequence to (B, T, J, 1, C)
             pose_sequence_reshaped = pose_sequence.unsqueeze(3)
+            pose_sequence_reshaped = pose_sequence_reshaped[:, :, :14, :, :2]
 
             # Compute absolute differences for both x and y dimensions
             abs_diff = torch.abs(pose_sequence_reshaped - pose_sequence_reshaped.permute(0, 1, 3, 2, 4))
 
             # shape: [B, T, C, J, J]
-            features = abs_diff.permute(0, 1, 4, 2, 3)[:,:,:2,:,:]
+            features = abs_diff.permute(0, 1, 4, 2, 3)
 
             features = features.float()
 
@@ -109,7 +109,7 @@ class Trainer:
 
             self.scheduler.step()
 
-            if (epoch+1) % 20 == 0 or epoch == 0:
+            if (epoch+1) % self._cfg.hparams.validation_period == 0 or epoch == 0:
                 self.validate()
 
     def validate(self):

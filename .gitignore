@@ -2,4 +2,4 @@ output/
 model/
 *__pycache__/
 wandb/
-logs/
+*logs/
