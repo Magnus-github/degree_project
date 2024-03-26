@@ -124,6 +124,8 @@ class Trainer:
             if (epoch+1) % self._cfg.hparams.validation_period == 0 or epoch == 0:
                 self.validate(epoch)
 
+        self.save_model()
+
     def validate(self, epoch):
         self.model.eval()
         logger.info("Starting validation...")
@@ -166,6 +168,8 @@ class Trainer:
         
         self.model.train()
 
+    def save_model(self):
+        torch.save(self.model.state_dict(), self._cfg.hparams.model_path)
 
 
 if __name__ == "__main__":

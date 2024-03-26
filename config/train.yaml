@@ -6,6 +6,7 @@ model:
         joint_hidden_channels: 64
         time_window: 9
         time_step: 3
+    save_path: model/FM_classification/STTransformer.pth
 dataset:
     name: data.dataset_KI:KIDataset
     fps: 25
@@ -14,7 +15,7 @@ dataset:
         data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth/
         annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
 hparams:
-    epochs: 10
+    epochs: 100
     batch_size: 1
     validation_period: 5
     criterion: 
