@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import numpy as np
 
 from omegaconf import OmegaConf
 import os
+import json
 import logging
 import coloredlogs
 import wandb
@@ -19,6 +21,11 @@ logger.setLevel(logging.INFO)
 coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)s] [%(levelname)s] %(message)s")
 
 
+def debugger_is_active() -> bool:
+    """Return if the debugger is currently active"""
+    return hasattr(sys, 'gettrace') and sys.gettrace() is not None
+
+
 class Trainer:
     def __init__(self, cfg, dataloaders):
         self._cfg = cfg
@@ -30,7 +37,9 @@ class Trainer:
         self.optimizer = torch.optim.SGD(self.model.parameters(), **cfg.hparams.optimizer.params)
         self.scheduler = torch.optim.lr_scheduler.CyclicLR(self.optimizer, **cfg.hparams.scheduler.params)
         self.model.to(self.device)
-        wandb.watch(self.model)
+        if not debugger_is_active() and cfg.logger.enable:
+            wandb.watch(self.model)
+        self.class_mapping = cfg.dataset.mapping
 
     def create_features(self, pose_sequence, name):
         if name == "distance_mat":
@@ -85,7 +94,8 @@ class Trainer:
             running_loss = 0.0
             for i, (data, target) in enumerate(tqdm(self.train_dataloader)):
                 pose_sequence = data
-                label = self.one_hot_encode(target)
+                # label = self.one_hot_encode(target)
+                label = torch.tensor([self.class_mapping[t] for t in target])
                 pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
 
@@ -99,10 +109,12 @@ class Trainer:
                 running_loss += loss.item()
 
                 # logger.info(f"Epoch {epoch}, batch {i}, loss: {loss.item()}")
-                wandb.log({"Train Loss [batch]": loss.item()})
+                if not debugger_is_active() and self._cfg.logger.enable:
+                    wandb.log({"Train Loss [batch]": loss.item()})
             
             logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
-            wandb.log({"Epoch": epoch,
+            if not debugger_is_active() and self._cfg.logger.enable:
+                wandb.log({"Epoch": epoch,
                        "Train Loss [epoch]": running_loss/len(self.train_dataloader)})
             
             running_loss = 0.0
@@ -110,35 +122,45 @@ class Trainer:
             self.scheduler.step()
 
             if (epoch+1) % self._cfg.hparams.validation_period == 0 or epoch == 0:
-                self.validate()
+                self.validate(epoch)
 
-    def validate(self):
+    def validate(self, epoch):
         self.model.eval()
         logger.info("Starting validation...")
         correct = 0
         total = 0
         outputs = torch.zeros(len(self.val_dataloader), 3)
+        labels = torch.zeros(len(self.val_dataloader))
         running_val_loss = 0.0
         with torch.no_grad():
             for i, (data, target) in enumerate(tqdm(self.val_dataloader)):
                 pose_sequence = data
-                label = self.one_hot_encode(target)
+                label = torch.tensor([self.class_mapping[t] for t in target])
+                labels[i] = label
                 pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 output = self.model(features)
-                outputs[i] = output
+                outputs[i] = output.softmax(axis=1)
                 val_loss = self.criterion(output, label)
                 running_val_loss += val_loss.item()
                 _, predicted = torch.max(output.data, 1)
-                _, ground_truth = torch.max(label, 1)
                 total += label.size(0)
-                correct += (predicted == ground_truth).sum().item()
+                correct += (predicted == label).sum().item()
 
         logger.info(f"Accuracy of the network on the {total} test sequences: {100 * correct / total}%")
         logger.info(f"Validation loss: {running_val_loss/len(self.val_dataloader)}")
-        wandb.log({"val_accuracy": 100 * correct / total,
+        # write output to file
+        if epoch == 0:
+            f = open("output/FM/validation_outputs.txt", "w")
+        else:
+            f = open("output/FM/validation_outputs.txt", "a")
+        f.write('Validation outputs and labels {}: \n{} \n'.format((epoch+1)//self._cfg.hparams.validation_period, torch.cat((outputs, labels.unsqueeze(1)), 1)))
+        f.close()
+
+        if not debugger_is_active() and self._cfg.logger.enable:
+            wandb.log({"val_accuracy": 100 * correct / total,
                    "val_loss": running_val_loss/len(self.val_dataloader),
                    "val_outputs": outputs})
         
@@ -152,12 +174,30 @@ if __name__ == "__main__":
     train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train")
     val_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="val")
 
-    train_dataoader = DataLoader(train_dataset, batch_size=cfg.hparams.batch_size, shuffle=True)
+    labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
+    y_train = [cfg.dataset.mapping[label] for label in labels_train]
+    class_sample_count = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
+    weight = 1. / class_sample_count
+    samples_weight = np.array([weight[t] for t in y_train])
+    samples_weight = torch.from_numpy(samples_weight)
+    # num_samples = len(samples_weight)
+    num_samples = int(max(class_sample_count)*len(class_sample_count))
+    sampler = torch.utils.data.WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), num_samples)
+
+    train_dataloader = DataLoader(train_dataset, batch_size=cfg.hparams.batch_size, sampler=sampler)
+
     val_dataloader = DataLoader(val_dataset, batch_size=cfg.hparams.batch_size, shuffle=True)
 
-    dataloaders = {"train": train_dataoader, "val": val_dataloader}
+    dataloaders = {"train": train_dataloader, "val": val_dataloader}
 
-    wandb.init(project='FM-classification', config=dict(cfg))
+    if debugger_is_active():
+        cfg.hparams.epochs = 1
+        cfg.hparams.validation_period = 1
+    elif cfg.logger.enable:
+        wandb.init(project='FM-classification', config=dict(cfg))
+    else:
+        cfg.hparams.epochs = 10
+        cfg.hparams.validation_period = 1
 
     trainer = Trainer(cfg, dataloaders)
 

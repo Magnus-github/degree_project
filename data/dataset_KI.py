@@ -7,6 +7,7 @@ import numpy as np
 import os
 import time
 import random
+from sklearn.utils.class_weight import compute_class_weight
 
 
 class KIDataset(Dataset):
@@ -71,18 +72,27 @@ class KIDataset(Dataset):
 if __name__ == "__main__":
     data_folder = "/Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed_smooth/"
     annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
-    d = KIDataset(data_folder=data_folder, annotations_path=annotations_path)
+    d_train = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="train")
+    d_val = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="val")
 
-    dataloader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=True)
-
-    print(len(d))
+    weights = [2.61538462, 1.61904762, 0.5]
+    mapping = {'1': 0, '4': 1, '12': 2}
+    labels_train = [d_train.labels[d_train.ids[int(file.split("_")[1])]] for file in d_train.data]
+    y_train = [mapping[label] for label in labels_train]
+    class_sample_count = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
+    weight = 1. / class_sample_count
+    samples_weight = np.array([weight[t] for t in y_train])
+    samples_weight = torch.from_numpy(samples_weight)
+    sampler = torch.utils.data.WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), int(max(class_sample_count)*len(class_sample_count)))
+    # sampler = torch.utils.data.WeightedRandomSampler(weights, len(d_train), replacement=True)
+    dataloader = torch.utils.data.DataLoader(d_train, batch_size=1, sampler=sampler)
     start = time.time()
     t = start
     label_lst  = []
     seq_lens = []
     for i, (pose_sequence, label) in enumerate(dataloader):
         B, T, J, C = pose_sequence.shape
-        label_lst.append(int(label[0]))
+        label_lst.append(mapping[label[0]])
         seq_lens.append(T)
 
         # Reshape pose_sequence to (B, T, J, 1, C)
@@ -101,9 +111,15 @@ if __name__ == "__main__":
         # print(f"Time: {time.time() - t}")
         # t = time.time()
 
+    print(i)
+
     print(f"Total time: {time.time() - start}")
     print(f"Average sequence length: {np.mean(seq_lens)}")
     print(f"Max sequence length: {np.max(seq_lens)}")
     print(f"Min sequence length: {np.min(seq_lens)}")
     print(f"Label distribution: {np.bincount(label_lst)}")
+
+    classes = np.unique(label_lst)
+    class_weights = compute_class_weight(class_weight='balanced', classes=classes, y=label_lst)
+    print(f"Class weights: {class_weights}")
 

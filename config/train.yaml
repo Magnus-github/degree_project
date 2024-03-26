@@ -9,17 +9,18 @@ model:
 dataset:
     name: data.dataset_KI:KIDataset
     fps: 25
+    mapping: {'1': 0, '4': 1, '12': 2}
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed_smooth/
+        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth/
         annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
 hparams:
     epochs: 10
     batch_size: 1
     validation_period: 5
     criterion: 
-        name: loss:WeightedCrossEntropyLoss
+        name: loss:CrossEntropyLoss
         params:
-            weights: [0.879, 0.758, 0.363]
+            weights: [2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
     optimizer:
         name: SGD
         params:
@@ -28,5 +29,8 @@ hparams:
     scheduler:
         name: CyclicLR
         params:
-            base_lr: 0.001
-            max_lr: 0.1
+            base_lr: 0.00025
+            max_lr: 0.00025
+logger:
+    name: wandb
+    enable: true
