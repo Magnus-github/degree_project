@@ -22,7 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, default="/Midgard/Data/tibbe/datasets/own/pose_sequences_openpose", help="Path to the directory with the video files")
     args = parser.parse_args()
 
-    new_path = new_path = "/".join(args.path.split("/")[:-1]) + "/pose_sequences_openpose_renamed1/"
+    new_path = new_path = "/".join(args.path.split("/")[:-1]) + "/poses_renamed/"
     print(new_path)
     print(args.path)
     os.makedirs(new_path, exist_ok=True)
