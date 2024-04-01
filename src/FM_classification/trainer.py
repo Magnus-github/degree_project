@@ -168,8 +168,12 @@ class Trainer:
         
         self.model.train()
 
-    def save_model(self):
-        torch.save(self.model.state_dict(), self._cfg.hparams.model_path)
+    def save_model(self, path: str = None):
+        if path is None:
+            path = self._cfg.model.save_path
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+        torch.save(self.model.state_dict(), self._cfg.model.save_path)
 
 
 if __name__ == "__main__":
@@ -186,6 +190,7 @@ if __name__ == "__main__":
     samples_weight = torch.from_numpy(samples_weight)
     # num_samples = len(samples_weight)
     num_samples = int(max(class_sample_count)*len(class_sample_count))
+    num_samples = 9
     sampler = torch.utils.data.WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), num_samples)
 
     train_dataloader = DataLoader(train_dataset, batch_size=cfg.hparams.batch_size, sampler=sampler)
@@ -200,11 +205,12 @@ if __name__ == "__main__":
     elif cfg.logger.enable:
         wandb.init(project='FM-classification', config=dict(cfg))
     else:
-        cfg.hparams.epochs = 10
+        cfg.hparams.epochs = 1
         cfg.hparams.validation_period = 1
 
     trainer = Trainer(cfg, dataloaders)
 
     trainer.train()
 
-    wandb.finish()
+    if cfg.logger.enable:
+        wandb.finish()

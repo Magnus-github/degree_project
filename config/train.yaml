@@ -12,8 +12,10 @@ dataset:
     fps: 25
     mapping: {'1': 0, '4': 1, '12': 2}
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth/
-        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        # data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth/
+        data_folder: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth/
+        annotations_path: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv
+        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
 hparams:
     epochs: 100
     batch_size: 1
@@ -34,4 +36,4 @@ hparams:
             max_lr: 0.00025
 logger:
     name: wandb
-    enable: true
+    enable: false
