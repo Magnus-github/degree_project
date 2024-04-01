@@ -17,7 +17,7 @@ dataset:
         annotations_path: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv
         # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
 hparams:
-    epochs: 100
+    epochs: 200
     batch_size: 1
     validation_period: 5
     criterion: 
@@ -32,8 +32,9 @@ hparams:
     scheduler:
         name: CyclicLR
         params:
-            base_lr: 0.00025
-            max_lr: 0.00025
+            base_lr: 0.0001
+            max_lr: 0.01
+            mode: triangular2
 logger:
     name: wandb
-    enable: false
+    enable: true
