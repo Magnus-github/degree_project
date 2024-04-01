@@ -277,6 +277,9 @@ def smoothing_from_df(cfg: dict):
             if not cfg.POST_PROCESS.DEBUG:
                 data["smoothed_joint_trajectories"] = smoothed_joint_trajectories.tolist()
 
+                out_np = os.path.join(cfg.POSES.SMOOTH_OUT_PATH, pose_file.split('.')[0] + '.npy')
+                np.save(out_np, smoothed_joint_trajectories)
+
             # save updated dataframe
             out_path = os.path.join(cfg.POSES.SMOOTH_OUT_PATH, pose_file)
             with open(out_path, 'wb') as f:

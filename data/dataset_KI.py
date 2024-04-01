@@ -46,7 +46,8 @@ class KIDataset(Dataset):
     def __getitem__(self, idx):
         pose_file = self.data[idx]
         with open(os.path.join(self.data_folder, pose_file), 'rb') as file:
-            data = pickle.load(file)
+            # data = pd.read_pickle(file)
+            data = np.load(file)
 
         # pose_sequence = (-1)*np.ones((len(data), 18, 3))
         # t = 0
@@ -60,9 +61,12 @@ class KIDataset(Dataset):
         #                 pose_sequence[t, i] = candidate[index, :3]
         #     t += 1
         # pose_sequence = torch.tensor(data["smoothed_joint_trajectories"])
-        pose_sequence = torch.zeros((len(data), 18, 3))
-        for i, frame in enumerate(data["smoothed_joint_trajectories"]):
-            pose_sequence[i] = torch.tensor(frame)
+            
+        # pose_sequence = torch.zeros((len(data), 18, 3))
+        # for i, frame in enumerate(data["smoothed_joint_trajectories"]):
+        #     pose_sequence[i] = torch.tensor(frame)
+        
+        pose_sequence = data
 
         id = int(pose_file.split("_")[1])
         label = self.labels[self.ids[id]]
@@ -70,8 +74,10 @@ class KIDataset(Dataset):
 
 
 if __name__ == "__main__":
-    data_folder = "/Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed_smooth/"
-    annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
+    # data_folder = "/Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed_smooth/"
+    data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
+    # annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
+    annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
     d_train = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="train")
     d_val = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="val")
 
@@ -83,7 +89,9 @@ if __name__ == "__main__":
     weight = 1. / class_sample_count
     samples_weight = np.array([weight[t] for t in y_train])
     samples_weight = torch.from_numpy(samples_weight)
-    sampler = torch.utils.data.WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), int(max(class_sample_count)*len(class_sample_count)))
+    num_samples = int(max(class_sample_count)*len(class_sample_count))
+    num_samples = 6
+    sampler = torch.utils.data.WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), num_samples)
     # sampler = torch.utils.data.WeightedRandomSampler(weights, len(d_train), replacement=True)
     dataloader = torch.utils.data.DataLoader(d_train, batch_size=1, sampler=sampler)
     start = time.time()

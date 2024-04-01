@@ -13,7 +13,7 @@ dataset:
     mapping: {'1': 0, '4': 1, '12': 2}
     params:
         # data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth/
-        data_folder: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth/
+        data_folder: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/
         annotations_path: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv
         # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
 hparams:
