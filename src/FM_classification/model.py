@@ -54,7 +54,7 @@ class STTransformer(nn.Module):
         self.norm = nn.BatchNorm2d(joint_hidden_channels)
         encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=4, dim_feedforward=4*joint_hidden_channels, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
-        self.dropout = nn.Dropout(0.1)  
+        self.dropout = nn.Dropout(0.6)  
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
         self.pe = PositionalEncoding(joint_hidden_channels, dropout=0.6)
         self.linear = nn.Linear(joint_hidden_channels, 3)

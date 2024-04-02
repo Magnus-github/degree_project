@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import os
 import time
+from tqdm import tqdm
 import random
 from sklearn.utils.class_weight import compute_class_weight
 
@@ -74,10 +75,10 @@ class KIDataset(Dataset):
 
 
 if __name__ == "__main__":
-    # data_folder = "/Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed_smooth/"
-    data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
-    # annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
-    annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
+    data_folder = "/Midgard/Data/tibbe/datasets/own/poses_smooth_np/"
+    # data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
+    annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
+    # annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
     d_train = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="train")
     d_val = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="val")
 
@@ -90,7 +91,7 @@ if __name__ == "__main__":
     samples_weight = np.array([weight[t] for t in y_train])
     samples_weight = torch.from_numpy(samples_weight)
     num_samples = int(max(class_sample_count)*len(class_sample_count))
-    num_samples = 6
+    # num_samples = 6
     sampler = torch.utils.data.WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), num_samples)
     # sampler = torch.utils.data.WeightedRandomSampler(weights, len(d_train), replacement=True)
     dataloader = torch.utils.data.DataLoader(d_train, batch_size=1, sampler=sampler)
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     t = start
     label_lst  = []
     seq_lens = []
-    for i, (pose_sequence, label) in enumerate(dataloader):
+    for i, (pose_sequence, label) in tqdm(enumerate(dataloader)):
         B, T, J, C = pose_sequence.shape
         label_lst.append(mapping[label[0]])
         seq_lens.append(T)

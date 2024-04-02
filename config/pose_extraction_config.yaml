@@ -6,10 +6,10 @@ POSE_ESTIMATION:
     VIDEO_FOLDER: /Midgard/Data/tibbe/datasets/own/
     OUTPUT_FOLDER: degree_project/output/pose_estimation
 POSES:
-    # PATH: /Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed/
-    PATH: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_renamed
-    # SMOOTH_OUT_PATH: /Midgard/Data/tibbe/datasets/own/poses_smooth/
-    SMOOTH_OUT_PATH: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth1
+    PATH: /Midgard/Data/tibbe/datasets/own/pose_sequences_openpose_renamed/
+    # PATH: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_renamed
+    SMOOTH_OUT_PATH: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
+    # SMOOTH_OUT_PATH: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth1
 POST_PROCESS:
     MODE: 'from_df' # options: [from_dict, from_df]
     DEBUG: False

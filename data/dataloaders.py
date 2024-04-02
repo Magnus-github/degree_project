@@ -16,8 +16,8 @@ def get_dataloaders(cfg):
     samples_weight = np.array([weight[t] for t in y_train])
     samples_weight = torch.from_numpy(samples_weight)
     # num_samples = len(samples_weight)
-    num_samples = int(max(class_sample_count)*len(class_sample_count))
-    num_samples = 9
+    # num_samples = int(max(class_sample_count)*len(class_sample_count))
+    num_samples = int(min(class_sample_count)*len(class_sample_count))
     sampler = torch.utils.data.WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), num_samples)
 
     train_dataloader = DataLoader(train_dataset, batch_size=cfg.hparams.batch_size, sampler=sampler)

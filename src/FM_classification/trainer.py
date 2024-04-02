@@ -29,6 +29,8 @@ class Trainer:
         self._cfg = cfg
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = str_to_class(cfg.model.name)(**cfg.model.in_params)
+        if cfg.model.load_weights.enable:
+            self.model.load_state_dict(torch.load(cfg.model.load_weights.path, map_location=self.device))
         self.train_dataloader = dataloaders['train']
         self.val_dataloader = dataloaders['val']
         self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
@@ -124,7 +126,8 @@ class Trainer:
             if (epoch+1) % self._cfg.hparams.validation_period == 0 or epoch == 0:
                 self.validate(epoch)
 
-        self.save_model()
+        if self._cfg.logger.enable:
+            self.save_model()
 
     def validate(self, epoch):
         self.model.eval()
