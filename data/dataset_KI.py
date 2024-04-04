@@ -72,6 +72,28 @@ class KIDataset(Dataset):
         id = int(pose_file.split("_")[1])
         label = self.labels[self.ids[id]]
         return pose_sequence, label
+    
+
+class KIDataset_clips(KIDataset):
+    def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", seed: int = 42):
+        super().__init__(data_folder, annotations_path, mode, seed)
+
+    def __getitem__(self, idx):
+        pose_file = self.data[idx]
+        with open(os.path.join(self.data_folder, pose_file), 'rb') as file:
+            data = np.load(file)
+        
+        pose_sequence = data
+
+        count = 0
+        for  file in os.listdir(self.data_folder):
+            if pose_file.split("_")[:-1] in file:
+                count += 1
+
+        id = int(pose_file.split("_")[1])
+        label = self.labels[self.ids[id]]
+        return pose_sequence, label, count
+
 
 
 if __name__ == "__main__":
@@ -79,7 +101,7 @@ if __name__ == "__main__":
     # data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
     annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
     # annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
-    d_train = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="train")
+    d_train = KIDataset_clips(data_folder=data_folder, annotations_path=annotations_path, mode="train")
     d_val = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="val")
 
     weights = [2.61538462, 1.61904762, 0.5]
