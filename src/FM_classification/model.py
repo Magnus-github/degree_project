@@ -56,7 +56,7 @@ class STTransformer(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         self.dropout = nn.Dropout(dropout)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
-        self.pe = PositionalEncoding(joint_hidden_channels, dropout=dropout)
+        self.pe = PositionalEncoding(joint_hidden_channels, dropout=0.6)
         self.linear = nn.Linear(joint_hidden_channels, 3)
         #instance to bag
         # self.attention2 = Attention(2, joint_hidden_channels//2)

@@ -3,7 +3,7 @@ model:
     in_features: distance_mat # options: [distance_mat, kinematics(pos, vel, acc, depth)]
     load_weights:
         enable: true
-        path: model/FM_classification/STTransformer.pth
+        path: model/FM_classification/STTransformer_overfit.pth
     in_params:
         joint_in_channels: 2
         joint_hidden_channels: 64
@@ -24,24 +24,31 @@ dataset:
         # annotations_path: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv
         annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
 hparams:
-    epochs: 1
+    epochs: 1000
     batch_size: 1
-    validation_period: 5
+    validation_period: 1
     criterion: 
         name: loss:CrossEntropyLoss
         params: # only used for WeightedCrossEntropyLoss
             weights: [2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
     optimizer:
-        name: SGD
+        name: optimizer:SGD
         params:
-            lr: 0.1
+            lr: 0.00025
             weight_decay: 0.0001
     scheduler:
-        name: CyclicLR
+        name: optimizer:CyclicLR
         params:
             base_lr: 0.00025
-            max_lr: 0.025
+            max_lr: 0.0025
+            step_size_up: 200
+            step_size_down: 200
             mode: triangular2
+        params_reduce_on_plateau:
+            factor: 0.25
+            patience: 10
+            threshold: 0.0001
+            threshold_mode: 'rel'
 logger:
     name: wandb
     enable: true

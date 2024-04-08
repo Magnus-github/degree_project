@@ -9,9 +9,9 @@ def get_dataloaders(cfg):
     train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train")
     val_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="val")
 
+    labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
+    y_train = [cfg.dataset.mapping[label] for label in labels_train]
     if cfg.dataset.sampling.enable:
-        labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
-        y_train = [cfg.dataset.mapping[label] for label in labels_train]
         class_sample_count = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
         weight = 1. / class_sample_count
         samples_weight = np.array([weight[t] for t in y_train])
@@ -23,6 +23,9 @@ def get_dataloaders(cfg):
         sampler = torch.utils.data.WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), num_samples)
     else:
         sampler = None
+        label_distribution = {label: y_train.count(label) for label in set(y_train)}
+        print(f"Label distribution: {label_distribution}")
+
 
     train_dataloader = DataLoader(train_dataset, batch_size=cfg.hparams.batch_size, sampler=sampler)
 

@@ -8,6 +8,8 @@ import coloredlogs
 import wandb
 from tqdm import tqdm
 
+import time
+import datetime
 import sys
 sys.path.append(os.curdir)
 
@@ -28,7 +30,9 @@ class Trainer:
     def __init__(self, cfg, dataloaders, run_id=None):
         self._cfg = cfg
         if run_id is None:
-            run_id = 0
+            run_id = "debug"
+        else:
+            run_id = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d_%H:%M:%S') + "_" + run_id
         self.output_dir = os.path.join(self._cfg.outputs.path, str(run_id))
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -39,8 +43,8 @@ class Trainer:
         self.train_dataloader = dataloaders['train']
         self.val_dataloader = dataloaders['val']
         self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
-        self.optimizer = torch.optim.SGD(self.model.parameters(), **cfg.hparams.optimizer.params)
-        self.scheduler = torch.optim.lr_scheduler.CyclicLR(self.optimizer, **cfg.hparams.scheduler.params)
+        self.optimizer = str_to_class(cfg.hparams.optimizer.name)(self.model.parameters(), **cfg.hparams.optimizer.params)
+        self.scheduler = str_to_class(cfg.hparams.scheduler.name)(self.optimizer, **cfg.hparams.scheduler.params)
         self.model.to(self.device)
         if not debugger_is_active() and cfg.logger.enable:
             wandb.watch(self.model)
@@ -97,7 +101,8 @@ class Trainer:
         logger.info("Starting training...")
         outputs = torch.zeros(len(self.train_dataloader), 3)
         labels = torch.zeros(len(self.train_dataloader))
-        last_lr = self.scheduler.get_lr()[-1]
+        # last_lr = self.scheduler.get_last_lr()[0]
+        last_lr = self.optimizer.param_groups[0]['lr']
         for epoch in range(self._cfg.hparams.epochs):
             running_loss = 0.0
             for i, (data) in enumerate(tqdm(self.train_dataloader)):
@@ -125,10 +130,10 @@ class Trainer:
                 if not debugger_is_active() and self._cfg.logger.enable:
                     wandb.log({"Train Loss [batch]": loss.item()})
 
-                self.scheduler.step()
+                # self.scheduler.step()
                 if not debugger_is_active() and self._cfg.logger.enable:
-                    if last_lr != self.scheduler.get_lr()[-1] or i == 0:
-                        last_lr = self.scheduler.get_lr()[-1]
+                    if last_lr != self.optimizer.param_groups[0]['lr'] or i == 0:
+                        last_lr = self.optimizer.param_groups[0]['lr']
                         wandb.log({"Learning Rate": last_lr})
 
             train_accuracy = self.compute_accuracy(outputs, labels)
@@ -136,18 +141,21 @@ class Trainer:
             logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
             if not debugger_is_active() and self._cfg.logger.enable:
                 wandb.log({"Epoch": epoch,
-                       "Train Loss [epoch]": running_loss/len(self.train_dataloader),
+                    "Train Loss [epoch]": running_loss/len(self.train_dataloader),
                        "Train Accuracy": train_accuracy})
-            
-            running_loss = 0.0
-
-            # self.scheduler.step()
 
             if (epoch+1) % self._cfg.hparams.validation_period == 0 or epoch == 0:
                 self.validate(epoch)
+            
+            if "ReduceLROnPlateau" in self._cfg.hparams.scheduler.name:
+                self.scheduler.step(running_loss/len(self.train_dataloader))
+            else:
+                self.scheduler.step()
 
             if self._cfg.logger.enable and (epoch+1) % self._cfg.model.save_period == 0:
-                self.save_model()
+                self.save_model(epoch)
+            
+            running_loss = 0.0
 
         if self._cfg.logger.enable:
             self.save_model()
@@ -228,7 +236,7 @@ if __name__ == "__main__":
         cfg.hparams.epochs = 1
         cfg.hparams.validation_period = 1
 
-    trainer = Trainer(cfg, dataloaders, run_id=run.id if cfg.logger.enable else None)
+    trainer = Trainer(cfg, dataloaders, run_id=run.name if cfg.logger.enable else None)
 
     trainer.train()
 
