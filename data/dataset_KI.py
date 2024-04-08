@@ -75,7 +75,9 @@ class KIDataset(Dataset):
     
 
 class KIDataset_clips(KIDataset):
-    def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", seed: int = 42):
+    def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/clips_smooth_np/",
+                 annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
+                 mode: str = "train", seed: int = 42):
         super().__init__(data_folder, annotations_path, mode, seed)
 
     def __getitem__(self, idx):
@@ -87,7 +89,7 @@ class KIDataset_clips(KIDataset):
 
         count = 0
         for  file in os.listdir(self.data_folder):
-            if pose_file.split("_")[:-1] in file:
+            if "_".join(pose_file.split("_")[:-1]) in file:
                 count += 1
 
         id = int(pose_file.split("_")[1])
@@ -97,7 +99,7 @@ class KIDataset_clips(KIDataset):
 
 
 if __name__ == "__main__":
-    data_folder = "/Midgard/Data/tibbe/datasets/own/poses_smooth_np/"
+    data_folder = "/Midgard/Data/tibbe/datasets/own/clips_smooth_np/"
     # data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
     annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
     # annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
@@ -116,12 +118,12 @@ if __name__ == "__main__":
     # num_samples = 6
     sampler = torch.utils.data.WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), num_samples)
     # sampler = torch.utils.data.WeightedRandomSampler(weights, len(d_train), replacement=True)
-    dataloader = torch.utils.data.DataLoader(d_train, batch_size=1, sampler=sampler)
+    dataloader = torch.utils.data.DataLoader(d_train, batch_size=1)
     start = time.time()
     t = start
     label_lst  = []
     seq_lens = []
-    for i, (pose_sequence, label) in tqdm(enumerate(dataloader)):
+    for i, (pose_sequence, label, count) in enumerate(tqdm(dataloader)):
         B, T, J, C = pose_sequence.shape
         label_lst.append(mapping[label[0]])
         seq_lens.append(T)

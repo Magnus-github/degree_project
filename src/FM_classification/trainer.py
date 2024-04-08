@@ -90,11 +90,15 @@ class Trainer:
     def train(self):
         self.model.train()
         logger.info("Starting training...")
+        print(len(self.train_dataloader))
         for epoch in range(cfg.hparams.epochs):
             running_loss = 0.0
-            for i, (data, target) in enumerate(tqdm(self.train_dataloader)):
-                pose_sequence = data
-                # label = self.one_hot_encode(target)
+            for i, (data) in enumerate(tqdm(self.train_dataloader)):
+                if len(data) == 3:
+                    pose_sequence, target, count = data
+                else:
+                    pose_sequence, target = data
+                
                 label = torch.tensor([self.class_mapping[t] for t in target])
                 pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
@@ -138,8 +142,12 @@ class Trainer:
         labels = torch.zeros(len(self.val_dataloader))
         running_val_loss = 0.0
         with torch.no_grad():
-            for i, (data, target) in enumerate(tqdm(self.val_dataloader)):
-                pose_sequence = data
+            for i, (data) in enumerate(tqdm(self.val_dataloader)):
+                if len(data) == 3:
+                    pose_sequence, target, count = data
+                else:
+                    pose_sequence, target = data
+
                 label = torch.tensor([self.class_mapping[t] for t in target])
                 labels[i] = label
                 pose_sequence = pose_sequence.to(self.device)

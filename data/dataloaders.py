@@ -22,6 +22,6 @@ def get_dataloaders(cfg):
 
     train_dataloader = DataLoader(train_dataset, batch_size=cfg.hparams.batch_size, sampler=sampler)
 
-    val_dataloader = DataLoader(val_dataset, batch_size=cfg.hparams.batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=True)
 
     return {"train": train_dataloader, "val": val_dataloader}

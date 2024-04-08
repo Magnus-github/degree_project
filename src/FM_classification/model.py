@@ -46,7 +46,7 @@ class PositionalEncoding(nn.Module):
 
 
 class STTransformer(nn.Module):
-    def __init__(self, joint_in_channels=2, joint_hidden_channels=64, time_window=9, time_step=3):
+    def __init__(self, joint_in_channels=2, joint_hidden_channels=64, time_window=9, time_step=3, dropout=0.4):
         super().__init__()
         #x
         self.cnn = nn.Conv2d(joint_in_channels, joint_hidden_channels, [1,14],[1,1])
@@ -54,9 +54,9 @@ class STTransformer(nn.Module):
         self.norm = nn.BatchNorm2d(joint_hidden_channels)
         encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=4, dim_feedforward=4*joint_hidden_channels, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
-        self.dropout = nn.Dropout(0.6)  
+        self.dropout = nn.Dropout(dropout)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
-        self.pe = PositionalEncoding(joint_hidden_channels, dropout=0.6)
+        self.pe = PositionalEncoding(joint_hidden_channels, dropout=dropout)
         self.linear = nn.Linear(joint_hidden_channels, 3)
         #instance to bag
         # self.attention2 = Attention(2, joint_hidden_channels//2)
@@ -70,7 +70,7 @@ class STTransformer(nn.Module):
         K = T//t
         x = x.view(B, K, t, c, j, j_)
 
-        x = x.view(B*K*t,c,j,j_)
+        x = x.reshape(B*K*t,c,j,j_)
         x = self.cnn(x) # [B*K*t, c', j, j'] (j'=1)
         # x = F.relu(x)
         x = F.sigmoid(x)

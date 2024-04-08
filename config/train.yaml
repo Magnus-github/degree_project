@@ -9,6 +9,7 @@ model:
         joint_hidden_channels: 64
         time_window: 9
         time_step: 3
+        dropout: 0.4
     save_path: model/FM_classification/STTransformer.pth
 dataset:
     name: data.dataset_KI:KIDataset
@@ -20,9 +21,9 @@ dataset:
         # annotations_path: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv
         annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
 hparams:
-    epochs: 800
+    epochs: 2000
     batch_size: 1
-    validation_period: 5
+    validation_period: 50
     criterion: 
         name: loss:CrossEntropyLoss
         params: # only used for WeightedCrossEntropyLoss
