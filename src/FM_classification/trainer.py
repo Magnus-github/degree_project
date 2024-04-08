@@ -25,8 +25,13 @@ def debugger_is_active() -> bool:
 
 
 class Trainer:
-    def __init__(self, cfg, dataloaders):
+    def __init__(self, cfg, dataloaders, run_id=None):
         self._cfg = cfg
+        if run_id is None:
+            run_id = 0
+        self.output_dir = os.path.join(self._cfg.outputs.path, str(run_id))
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = str_to_class(cfg.model.name)(**cfg.model.in_params)
         if cfg.model.load_weights.enable:
@@ -90,8 +95,10 @@ class Trainer:
     def train(self):
         self.model.train()
         logger.info("Starting training...")
-        print(len(self.train_dataloader))
-        for epoch in range(cfg.hparams.epochs):
+        outputs = torch.zeros(len(self.train_dataloader), 3)
+        labels = torch.zeros(len(self.train_dataloader))
+        last_lr = self.scheduler.get_lr()[-1]
+        for epoch in range(self._cfg.hparams.epochs):
             running_loss = 0.0
             for i, (data) in enumerate(tqdm(self.train_dataloader)):
                 if len(data) == 3:
@@ -102,11 +109,13 @@ class Trainer:
                 label = torch.tensor([self.class_mapping[t] for t in target])
                 pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
+                labels[i] = label
 
                 self.optimizer.zero_grad()
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 output = self.model(features)
+                outputs[i] = output.softmax(axis=1)
                 loss = self.criterion(output, label)
                 loss.backward()
                 self.optimizer.step()
@@ -117,11 +126,18 @@ class Trainer:
                     wandb.log({"Train Loss [batch]": loss.item()})
 
                 self.scheduler.step()
+                if not debugger_is_active() and self._cfg.logger.enable:
+                    if last_lr != self.scheduler.get_lr()[-1] or i == 0:
+                        last_lr = self.scheduler.get_lr()[-1]
+                        wandb.log({"Learning Rate": last_lr})
+
+            train_accuracy = self.compute_accuracy(outputs, labels)
             
             logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
             if not debugger_is_active() and self._cfg.logger.enable:
                 wandb.log({"Epoch": epoch,
-                       "Train Loss [epoch]": running_loss/len(self.train_dataloader)})
+                       "Train Loss [epoch]": running_loss/len(self.train_dataloader),
+                       "Train Accuracy": train_accuracy})
             
             running_loss = 0.0
 
@@ -130,14 +146,15 @@ class Trainer:
             if (epoch+1) % self._cfg.hparams.validation_period == 0 or epoch == 0:
                 self.validate(epoch)
 
+            if self._cfg.logger.enable and (epoch+1) % self._cfg.model.save_period == 0:
+                self.save_model()
+
         if self._cfg.logger.enable:
             self.save_model()
 
     def validate(self, epoch):
         self.model.eval()
         logger.info("Starting validation...")
-        correct = 0
-        total = 0
         outputs = torch.zeros(len(self.val_dataloader), 3)
         labels = torch.zeros(len(self.val_dataloader))
         running_val_loss = 0.0
@@ -158,33 +175,43 @@ class Trainer:
                 outputs[i] = output.softmax(axis=1)
                 val_loss = self.criterion(output, label)
                 running_val_loss += val_loss.item()
-                _, predicted = torch.max(output.data, 1)
-                total += label.size(0)
-                correct += (predicted == label).sum().item()
+                # _, predicted = torch.max(output.data, 1)
+                # total += label.size(0)
+                # correct += (predicted == label).sum().item()
 
-        logger.info(f"Accuracy of the network on the {total} test sequences: {100 * correct / total}%")
+        accuracy = self.compute_accuracy(outputs, labels)
+        logger.info(f"Accuracy of the network on the {len(self.val_dataloader)} test sequences: {100*accuracy}%")
         logger.info(f"Validation loss: {running_val_loss/len(self.val_dataloader)}")
         # write output to file
         if epoch == 0:
-            f = open("output/FM/validation_outputs.txt", "w")
+            f = open(os.path.join(self.output_dir, "validation_outputs.txt"), "w")
         else:
-            f = open("output/FM/validation_outputs.txt", "a")
+            f = open(os.path.join(self.output_dir, "validation_outputs.txt"), "a")
         f.write('Validation outputs and labels {}: \n{} \n'.format((epoch+1)//self._cfg.hparams.validation_period, torch.cat((outputs, labels.unsqueeze(1)), 1)))
         f.close()
 
         if not debugger_is_active() and self._cfg.logger.enable:
-            wandb.log({"val_accuracy": 100 * correct / total,
-                   "val_loss": running_val_loss/len(self.val_dataloader),
-                   "val_outputs": outputs})
+            wandb.log({"val_accuracy": accuracy,
+                   "val_loss": running_val_loss/len(self.val_dataloader)})
         
         self.model.train()
 
-    def save_model(self, path: str = None):
-        if path is None:
-            path = self._cfg.model.save_path
-        if not os.path.exists(os.path.dirname(path)):
-            os.makedirs(os.path.dirname(path))
-        torch.save(self.model.state_dict(), self._cfg.model.save_path)
+    def compute_accuracy(self, outputs, labels):
+        _, predicted = torch.max(outputs, 1)
+        total = labels.size(0)
+        correct = (predicted == labels).sum().item()
+        return correct / total
+
+    def save_model(self, epoch=None):
+        path = os.path.join(self.output_dir, "model")
+        if not os.path.exists(path):
+            os.makedirs(path)
+        model_name = self._cfg.model.name.split(":")[-1]
+        if epoch is None:
+            id = "final"
+        else:
+            id = epoch
+        torch.save(self.model.state_dict(), os.path.join(path, f"{model_name}_{id}.pth"))
 
 
 if __name__ == "__main__":
@@ -196,12 +223,12 @@ if __name__ == "__main__":
         cfg.hparams.epochs = 1
         cfg.hparams.validation_period = 1
     elif cfg.logger.enable:
-        wandb.init(project='FM-classification', config=dict(cfg))
+        run = wandb.init(project='FM-classification', config=dict(cfg))
     else:
         cfg.hparams.epochs = 1
         cfg.hparams.validation_period = 1
 
-    trainer = Trainer(cfg, dataloaders)
+    trainer = Trainer(cfg, dataloaders, run_id=run.id if cfg.logger.enable else None)
 
     trainer.train()
 

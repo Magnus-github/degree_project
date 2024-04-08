@@ -10,20 +10,23 @@ model:
         time_window: 9
         time_step: 3
         dropout: 0.4
-    save_path: model/FM_classification/STTransformer.pth
+    save_period: 50
 dataset:
     name: data.dataset_KI:KIDataset
     fps: 25
     mapping: {'1': 0, '4': 1, '12': 2}
+    sampling: 
+        enable: true
+        method: oversampling # options: [oversampling, undersampling]
     params:
         data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
         # data_folder: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/
         # annotations_path: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv
         annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
 hparams:
-    epochs: 2000
+    epochs: 1
     batch_size: 1
-    validation_period: 50
+    validation_period: 5
     criterion: 
         name: loss:CrossEntropyLoss
         params: # only used for WeightedCrossEntropyLoss
@@ -42,3 +45,5 @@ hparams:
 logger:
     name: wandb
     enable: true
+outputs:
+    path: output/FM
