@@ -5,6 +5,7 @@ import math
 from torch.autograd import Variable
 
 
+
 class Attention(nn.Module):
     def __init__(self, in_dim, hid_dim):
         super(Attention, self).__init__()
@@ -45,14 +46,15 @@ class PositionalEncoding(nn.Module):
 
 
 class STTransformer(nn.Module):
-    def __init__(self, joint_in_channels=3, joint_hidden_channels=96, time_window=9, time_step=3):
+    def __init__(self, joint_in_channels=2, joint_hidden_channels=64, time_window=9, time_step=3, dropout=0.4):
         super().__init__()
         #x
-        self.cnn = nn.Conv2d(joint_in_channels, joint_hidden_channels, [1,18],[1,1])
+        self.cnn = nn.Conv2d(joint_in_channels, joint_hidden_channels, [1,14],[1,1])
         self.tcn = nn.Conv2d(joint_hidden_channels, joint_hidden_channels, [time_window,1],[time_step,1])
+        self.norm = nn.BatchNorm2d(joint_hidden_channels)
         encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=4, dim_feedforward=4*joint_hidden_channels, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
-        self.dropout = nn.Dropout(0.6)  
+        self.dropout = nn.Dropout(dropout)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
         self.pe = PositionalEncoding(joint_hidden_channels, dropout=0.6)
         self.linear = nn.Linear(joint_hidden_channels, 3)
@@ -68,18 +70,23 @@ class STTransformer(nn.Module):
         K = T//t
         x = x.view(B, K, t, c, j, j_)
 
-        x = x.view(B*K*t,c,j,j_)
-        x = self.cnn(x)
-        x = F.relu(x)
+        x = x.reshape(B*K*t,c,j,j_)
+        x = self.cnn(x) # [B*K*t, c', j, j'] (j'=1)
+        # x = F.relu(x)
+        x = F.sigmoid(x)
         x = self.dropout(x)
         x = x.view(B*K,t,-1,j)
         x = x.permute(0, 2, 1, 3).contiguous() # [B*K, c', t, j]
-        x = self.tcn(x)
-        x = F.relu(x)
-        x = self.dropout(x) # [B*K, c', t', j]
-        x = self.tcn(x)
-        x = F.relu(x)
-        x = self.dropout(x) # [B*K, c', t'', j]
+        # x = self.tcn(x) # [B*K, c', t', j]
+        # x = self.norm(x)
+        # # x = F.relu(x)
+        # x = F.sigmoid(x)
+        # x = self.dropout(x)
+        # x = self.tcn(x) # [B*K, c', t'', j]
+        # x = self.norm(x)
+        # # x = F.relu(x)
+        # x = F.sigmoid(x)
+        # x = self.dropout(x)
 
         # transformer layers
         BK, c_, t_, j = x.shape # Batch*num_Clips, hidden_channels, num_Frames/clip, Joints
@@ -94,25 +101,22 @@ class STTransformer(nn.Module):
 
         # clip/instance classification
         clip_cls = self.linear(x) # [B*K, 3]
-        clip_cls = torch.softmax(clip_cls, dim=-1)
+        # clip_cls = torch.softmax(clip_cls, dim=-1)
 
         # bag classification using max pooling
-        pool = nn.MaxPool1d(K)
+        # pool = nn.MaxPool1d(K)
+        pool = nn.AvgPool1d(K)
         vid_cls = clip_cls.view(B, K, 3).permute(0, 2, 1).contiguous()
         vid_cls = pool(vid_cls).squeeze(dim=-1)
+
+        # vid_cls = torch.softmax(vid_cls, dim=-1)
 
         return vid_cls
 
 
+if __name__ == "__main__":
+    example = torch.randn(1, 240*2, 2, 14, 14)
 
+    model = STTransformer()
 
-
-
-
-
-
-
-        
-
-
-
+    out = model(example)

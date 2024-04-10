@@ -1,12 +1,8 @@
 import numpy as np
-from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 import json
-import util
-import cv2
-import matplotlib.pyplot as plt
+import argparse
 from scipy.interpolate import CubicSpline
-from tqdm import tqdm
 import os
 import pandas as pd
 import pickle
@@ -253,7 +249,7 @@ def smoothing_from_df(cfg: dict):
     # load pose dict
     pose__estim_out_folder = cfg.POSES.PATH
 
-    for pose_file in os.listdir(pose__estim_out_folder):
+    for i, pose_file in enumerate(os.listdir(pose__estim_out_folder)):
         if pose_file.endswith('.pkl'):
             pose_file_path = os.path.join(pose__estim_out_folder, pose_file)
             with open(pose_file_path, 'rb') as f:
@@ -261,19 +257,28 @@ def smoothing_from_df(cfg: dict):
 
             # get joint trajectories
             joint_trajectories = get_joint_trajectories_from_df(data)
+            data["joint_trajectories"] = joint_trajectories.tolist()
 
             # smooth joint trajectories
             smoothed_joint_trajectories = smooth_joint_trajectories_from_array(joint_trajectories)
+            if cfg.POST_PROCESS.DEBUG:
+                data["smoothed_joint_trajectories"] = smoothed_joint_trajectories.tolist()
 
             # rotate joint trajectories
             smoothed_joint_trajectories  = rotate_joint_trajectories(smoothed_joint_trajectories)
+            if cfg.POST_PROCESS.DEBUG:
+                data["rotated_joint_trajectories"] = smoothed_joint_trajectories.tolist()
 
             # normalize joint trajectories
             smoothed_joint_trajectories = normalize_joint_trajectories(smoothed_joint_trajectories)
+            if cfg.POST_PROCESS.DEBUG:
+                data["normalized_joint_trajectories"] = smoothed_joint_trajectories.tolist()
             
+            if not cfg.POST_PROCESS.DEBUG:
+                data["smoothed_joint_trajectories"] = smoothed_joint_trajectories.tolist()
 
-            data["smoothed_joint_trajectories"] = smoothed_joint_trajectories.tolist()
-            data["joint_trajectories"] = joint_trajectories.tolist()
+                out_np = os.path.join(cfg.POSES.SMOOTH_OUT_PATH, pose_file.split('.')[0] + '.npy')
+                np.save(out_np, smoothed_joint_trajectories)
 
             # save updated dataframe
             out_path = os.path.join(cfg.POSES.SMOOTH_OUT_PATH, pose_file)
@@ -281,6 +286,7 @@ def smoothing_from_df(cfg: dict):
                 pickle.dump(data, f)
 
             print(f"Saved smoothed joint trajectories to {out_path}")
+            print(i)
             
 
 def main(cfg: dict):
@@ -339,6 +345,11 @@ def main(cfg: dict):
     
 
 if __name__ == '__main__':
-    cfg = OmegaConf.load("/Midgard/home/tibbe/thesis/degree_project/config/pose_extraction_config.yaml")
+    parser = argparse.ArgumentParser(description="Post-process pose estimation output")
+    parser.add_argument("--config", type=str, default="config/pose_extraction_config.yaml", help="Path to the config file")
+    args = parser.parse_args()
+
+
+    cfg = OmegaConf.load(args.config)
     main(cfg)
 
