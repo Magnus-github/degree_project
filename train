@@ -3,7 +3,7 @@
 #SBATCH --gres gpu:1
 #SBATCH --cpus-per-task 4
 #SBATCH --time 48:00:00
-#SBATCH --constrain "galadriel"
+#SBATCH --constrain "rivendell"
 #SBATCH --mail-type FAIL
 #SBATCH --mail-user tibbe@kth.se
 #SBATCH --output /Midgard/home/%u/thesis/degree_project/slurmlogs/%J_slurm.out

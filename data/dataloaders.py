@@ -6,7 +6,11 @@ from src.utils.str_to_class import str_to_class
 
 
 def get_dataloaders(cfg):
-    train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train")
+    if cfg.dataset.transform.enable:
+        transform = str_to_class(cfg.dataset.transform.name)(**cfg.dataset.transform.params)
+    else:
+        transform = None
+    train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train", transform=transform)
     val_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="val")
 
     labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]

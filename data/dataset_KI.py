@@ -9,10 +9,13 @@ import time
 from tqdm import tqdm
 import random
 from sklearn.utils.class_weight import compute_class_weight
+import scipy.signal as signal
+import matplotlib.pyplot as plt
+from data.augmentations import RandScale
 
 
 class KIDataset(Dataset):
-    def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", seed: int = 42):
+    def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", transform = None, seed: int = 42):
         self.data_folder = data_folder
         random.seed(seed)
         train_data = random.sample(os.listdir(self.data_folder), int(0.8*len(os.listdir(self.data_folder))))
@@ -29,6 +32,8 @@ class KIDataset(Dataset):
         self.labels = []
         self.ids = {}
         self._get_labels_and_ids(annotations_path)
+
+        self.transform = transform
 
 
     def __len__(self):
@@ -98,12 +103,16 @@ class KIDataset_clips(KIDataset):
 
 
 
+
+
+
+
 if __name__ == "__main__":
-    data_folder = "/Midgard/Data/tibbe/datasets/own/clips_smooth_np/"
+    data_folder = "/Midgard/Data/tibbe/datasets/own/poses_smooth_np/"
     # data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
     annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
     # annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
-    d_train = KIDataset_clips(data_folder=data_folder, annotations_path=annotations_path, mode="train")
+    d_train = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="train", transform=RandScale())
     d_val = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="val")
 
     weights = [2.61538462, 1.61904762, 0.5]
@@ -123,10 +132,24 @@ if __name__ == "__main__":
     t = start
     label_lst  = []
     seq_lens = []
-    for i, (pose_sequence, label, count) in enumerate(tqdm(dataloader)):
+    for i, (pose_sequence, label) in enumerate(tqdm(dataloader)):
         B, T, J, C = pose_sequence.shape
         label_lst.append(mapping[label[0]])
         seq_lens.append(T)
+
+        print(pose_sequence.shape, label)
+
+        # fig, axs = plt.subplots(J, 1, figsize=(15, 5*J))
+        # for joint in range(J):
+        #     axs[joint].plot(pose_sequence[0, :, joint, 0], label='x_0')
+        #     axs[joint].plot(pose_sequence[0, :, joint, 1], label='y_0')
+        #     axs[joint].set_title(f'Joint {joint} - Original')
+        #     axs[joint].legend()
+        
+        # plt.savefig(f'data/pose_augmented{i}.png')
+
+        if i == 10:
+            break
 
         # Reshape pose_sequence to (B, T, J, 1, C)
         # pose_sequence_reshaped = pose_sequence.unsqueeze(3)
