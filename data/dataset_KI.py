@@ -1,33 +1,30 @@
 import torch
 from torch.utils.data import Dataset
 import csv
-import pickle
-import pandas as pd
 import numpy as np
 import os
 import time
 from tqdm import tqdm
 import random
 from sklearn.utils.class_weight import compute_class_weight
-import scipy.signal as signal
-import matplotlib.pyplot as plt
-from data.augmentations import RandScale
 
 
 class KIDataset(Dataset):
     def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", transform = None, seed: int = 42):
         self.data_folder = data_folder
+        all_data = os.listdir(self.data_folder)
         random.seed(seed)
-        train_data = random.sample(os.listdir(self.data_folder), int(0.8*len(os.listdir(self.data_folder))))
-        val_test_data = list(set(os.listdir(self.data_folder)) - set(train_data))
+        train_data = random.sample(all_data, int(0.8*len(all_data)))
+        val_test_data = sorted(list(set(all_data) - set(train_data)))
         val_data = random.sample(val_test_data, int(0.5*len(val_test_data)))
-        test_data = list(set(val_test_data) - set(val_data))
+        test_data = sorted(list(set(val_test_data) - set(val_data)))
         if mode == "train":
             self.data = train_data
         if mode == "val":
             self.data = val_data
         if mode == "test":
             self.data = test_data
+            self.test = True
 
         self.labels = []
         self.ids = {}
@@ -52,30 +49,15 @@ class KIDataset(Dataset):
     def __getitem__(self, idx):
         pose_file = self.data[idx]
         with open(os.path.join(self.data_folder, pose_file), 'rb') as file:
-            # data = pd.read_pickle(file)
             data = np.load(file)
-
-        # pose_sequence = (-1)*np.ones((len(data), 18, 3))
-        # t = 0
-        # for subset, candidate in zip(data["limbs_subset"].items(), data["limbs_candidate"].items()):
-        #     subset = subset[1]
-        #     candidate = candidate[1]
-        #     for j in range(len(subset)):
-        #         for i in range(18):
-        #             index = int(subset[j][i])
-        #             if index != -1:
-        #                 pose_sequence[t, i] = candidate[index, :3]
-        #     t += 1
-        # pose_sequence = torch.tensor(data["smoothed_joint_trajectories"])
-            
-        # pose_sequence = torch.zeros((len(data), 18, 3))
-        # for i, frame in enumerate(data["smoothed_joint_trajectories"]):
-        #     pose_sequence[i] = torch.tensor(frame)
         
         pose_sequence = data
 
         id = int(pose_file.split("_")[1])
         label = self.labels[self.ids[id]]
+
+        if self.test:
+            return pose_sequence, label, id
         return pose_sequence, label
     
 
@@ -103,17 +85,15 @@ class KIDataset_clips(KIDataset):
 
 
 
-
-
-
-
 if __name__ == "__main__":
     data_folder = "/Midgard/Data/tibbe/datasets/own/poses_smooth_np/"
     # data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
     annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
     # annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
-    d_train = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="train", transform=RandScale())
+    d_train = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="train")
     d_val = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="val")
+
+
 
     weights = [2.61538462, 1.61904762, 0.5]
     mapping = {'1': 0, '4': 1, '12': 2}

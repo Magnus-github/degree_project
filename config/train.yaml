@@ -1,15 +1,15 @@
 model:
-    name: model:STTransformer
+    name: scripts.FM_classification.model:STTransformer
     in_features: distance_mat # options: [distance_mat, kinematics(pos, vel, acc, depth)]
     load_weights:
-        enable: true
+        enable: false
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
         joint_in_channels: 2
         joint_hidden_channels: 64
         time_window: 9
         time_step: 3
-        dropout: 0.4
+        dropout: 0.6
     save_period: 50
 dataset:
     name: data.dataset_KI:KIDataset
@@ -18,7 +18,7 @@ dataset:
         name: data.augmentations:RandScale
         params:
             magnitude: 0.8 # [0, 1]
-            p: 0.5 # [0, 1]
+            p: 0.8 # [0, 1]
     fps: 25
     mapping: {'1': 0, '4': 1, '12': 2}
     sampling: 
@@ -33,21 +33,28 @@ hparams:
     epochs: 1000
     batch_size: 1
     validation_period: 1
+    early_stopping:
+        enable: true
+        after_epoch: 200
+        patience: 50
+        slope_threshold: 0.05
+        metric: val_loss
+    save_best_threshold: 0.7 # save model if val_loss is better than threshold
     criterion: 
-        name: loss:CrossEntropyLoss
+        name: scripts.FM_classification.loss:CrossEntropyLoss
         params: # only used for WeightedCrossEntropyLoss
             weights: [2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
     optimizer:
-        name: optimizer:SGD
+        name: scripts.FM_classification.optimizer:SGD
         params:
             lr: 0.00025
             weight_decay: 0.0001
     scheduler:
-        name: optimizer:CyclicLR
+        name: scripts.FM_classification.optimizer:CyclicLR
         params:
             base_lr: 0.00025
             max_lr: 0.0025
-            step_size_up: 200
+            step_size_up: 1000
             step_size_down: 100
             mode: triangular2
         params_reduce_on_plateau:
@@ -59,4 +66,8 @@ logger:
     name: wandb
     enable: true
 outputs:
-    path: output/FM
+    # path: /Midgard/Data/tibbe/models/FM
+    path: /local_storage/users/tibbe/models/FM
+test:
+    enable: true
+    model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth

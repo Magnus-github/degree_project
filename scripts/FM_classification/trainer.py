@@ -8,22 +8,18 @@ import coloredlogs
 import wandb
 from tqdm import tqdm
 
-import time
+import pytz
 import datetime
 import sys
 sys.path.append(os.curdir)
 
-from src.utils.str_to_class import str_to_class
+from scripts.utils.str_to_class import str_to_class
 from data.dataloaders import get_dataloaders
+from scripts.utils.check_debugger import debugger_is_active
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)s] [%(levelname)s] %(message)s")
-
-
-def debugger_is_active() -> bool:
-    """Return if the debugger is currently active"""
-    return hasattr(sys, 'gettrace') and sys.gettrace() is not None
 
 
 class Trainer:
@@ -32,16 +28,23 @@ class Trainer:
         if run_id is None:
             run_id = "debug"
         else:
-            run_id = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d_%H:%M:%S') + "_" + run_id
+            datetime_str = datetime.datetime.now(pytz.timezone('Europe/Stockholm')).strftime("%Y-%m-%d_%H:%M:%S")
+            run_id = datetime_str + "_" + run_id
         self.output_dir = os.path.join(self._cfg.outputs.path, str(run_id))
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(cfg.model)
         self.model = str_to_class(cfg.model.name)(**cfg.model.in_params)
         if cfg.model.load_weights.enable:
-            self.model.load_state_dict(torch.load(cfg.model.load_weights.path, map_location=self.device))
+            if cfg.test.enable:
+               weights_path = cfg.test.model_weights
+            else:
+                weights_path = cfg.model.load_weights.path 
+            self.model.load_state_dict(torch.load(weights_path, map_location=self.device))
         self.train_dataloader = dataloaders['train']
         self.val_dataloader = dataloaders['val']
+        self.test_dataloader = dataloaders['test']
         self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
         self.optimizer = str_to_class(cfg.hparams.optimizer.name)(self.model.parameters(), **cfg.hparams.optimizer.params)
         self.scheduler = str_to_class(cfg.hparams.scheduler.name)(self.optimizer, **cfg.hparams.scheduler.params)
@@ -101,6 +104,10 @@ class Trainer:
         logger.info("Starting training...")
         outputs = torch.zeros(len(self.train_dataloader), 3)
         labels = torch.zeros(len(self.train_dataloader))
+        val_losses = []
+        x = np.arange(0, self._cfg.hparams.early_stopping.patience)
+        val_loss = np.inf
+        best_val_loss = np.inf
         # last_lr = self.scheduler.get_last_lr()[0]
         last_lr = self.optimizer.param_groups[0]['lr']
         for epoch in range(self._cfg.hparams.epochs):
@@ -145,15 +152,32 @@ class Trainer:
                        "Train Accuracy": train_accuracy})
 
             if (epoch+1) % self._cfg.hparams.validation_period == 0 or epoch == 0:
-                self.validate(epoch)
-            
+                val_loss = self.validate(epoch)
+
+                val_losses.append(val_loss)
+                if len(val_losses) > self._cfg.hparams.early_stopping.patience:
+                    val_losses.pop(0)
+
+                    if self._cfg.hparams.early_stopping.enable and epoch > self._cfg.hparams.early_stopping.after_epoch:
+                        y = np.array(val_losses)
+                        slope, _ = np.polyfit(x, y, 1)
+                        if slope > self._cfg.hparams.early_stopping.slope_threshold:
+                            logger.info(f"Early stopping at epoch {epoch}.")
+                            self.save_model(epoch=epoch)
+                            break
+
+                    if val_loss < best_val_loss and val_loss < self._cfg.hparams.save_best_threshold:
+                        best_val_loss = val_loss
+                        self.save_model(best=True)
+
+
             if "ReduceLROnPlateau" in self._cfg.hparams.scheduler.name:
                 self.scheduler.step(running_loss/len(self.train_dataloader))
             else:
                 self.scheduler.step()
 
             if self._cfg.logger.enable and (epoch+1) % self._cfg.model.save_period == 0:
-                self.save_model(epoch)
+                self.save_model(epoch=epoch)
             
             running_loss = 0.0
 
@@ -204,13 +228,51 @@ class Trainer:
         
         self.model.train()
 
+        return running_val_loss/len(self.val_dataloader)
+    
+    def test(self):
+        self.model.eval()
+        logger.info("Starting testing...")
+        outputs = torch.zeros(len(self.test_dataloader), 3)
+        labels = torch.zeros(len(self.test_dataloader))
+        ids = torch.zeros(len(self.test_dataloader))
+        with torch.no_grad():
+            for i, (data) in enumerate(self.test_dataloader):
+                if len(data) == 3:
+                    pose_sequence, target, id = data
+                else:
+                    pose_sequence, target = data
+
+                label = torch.tensor([self.class_mapping[t] for t in target])
+                labels[i] = label
+                pose_sequence = pose_sequence.to(self.device)
+                label = label.to(self.device)
+
+                ids[i] = id
+
+                features = self.create_features(pose_sequence, self._cfg.model.in_features)
+                print(id)
+                # if i == 0:^
+                output = self.model(features)
+                print(output)
+                outputs[i] = output.softmax(axis=1)
+
+        accuracy = self.compute_accuracy(outputs, labels)
+        logger.info(f"Accuracy of the network on the {len(self.test_dataloader)} test sequences: {100*accuracy}%")
+        # write output to file
+        f = open(os.path.join(self.output_dir, "test_outputs.txt"), "w")
+        f.write('Test outputs and labels: \n{} \n'.format(torch.cat((outputs, labels.unsqueeze(1), ids.unsqueeze(1)), 1)))
+        f.write(f"Accuracy of the network on the {len(self.test_dataloader)} test sequences: {100*accuracy}%")
+        f.close()
+        return
+
     def compute_accuracy(self, outputs, labels):
         _, predicted = torch.max(outputs, 1)
         total = labels.size(0)
         correct = (predicted == labels).sum().item()
         return correct / total
 
-    def save_model(self, epoch=None):
+    def save_model(self, epoch=None, best=False):
         path = os.path.join(self.output_dir, "model")
         if not os.path.exists(path):
             os.makedirs(path)
@@ -219,11 +281,15 @@ class Trainer:
             id = "final"
         else:
             id = epoch
+        if best:
+            id = "best"
         torch.save(self.model.state_dict(), os.path.join(path, f"{model_name}_{id}.pth"))
 
 
 if __name__ == "__main__":
     cfg = OmegaConf.load("config/train.yaml")
+    if cfg.test.enable:
+        cfg.logger.enable = False
 
     dataloaders = get_dataloaders(cfg)
 
@@ -233,12 +299,16 @@ if __name__ == "__main__":
     elif cfg.logger.enable:
         run = wandb.init(project='FM-classification', config=dict(cfg))
     else:
-        cfg.hparams.epochs = 1
+        cfg.hparams.epochs = 25
         cfg.hparams.validation_period = 1
 
     trainer = Trainer(cfg, dataloaders, run_id=run.name if cfg.logger.enable else None)
 
-    trainer.train()
+    if cfg.test.enable:
+        cfg.model.load_weights.enable = True
+        trainer.test()
+    else:
+        trainer.train()
 
     if cfg.logger.enable:
         wandb.finish()

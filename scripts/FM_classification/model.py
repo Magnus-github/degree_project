@@ -48,6 +48,7 @@ class PositionalEncoding(nn.Module):
 class STTransformer(nn.Module):
     def __init__(self, joint_in_channels=2, joint_hidden_channels=64, time_window=9, time_step=3, dropout=0.4):
         super().__init__()
+        print("DROPOUT", dropout)
         #x
         self.cnn = nn.Conv2d(joint_in_channels, joint_hidden_channels, [1,14],[1,1])
         self.tcn = nn.Conv2d(joint_hidden_channels, joint_hidden_channels, [time_window,1],[time_step,1])
@@ -56,7 +57,7 @@ class STTransformer(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         self.dropout = nn.Dropout(dropout)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
-        self.pe = PositionalEncoding(joint_hidden_channels, dropout=0.6)
+        self.pe = PositionalEncoding(joint_hidden_channels, dropout=dropout)
         self.linear = nn.Linear(joint_hidden_channels, 3)
         #instance to bag
         # self.attention2 = Attention(2, joint_hidden_channels//2)

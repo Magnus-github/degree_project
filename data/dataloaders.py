@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from src.utils.str_to_class import str_to_class
+from scripts.utils.str_to_class import str_to_class
 
 
 def get_dataloaders(cfg):
@@ -12,6 +12,7 @@ def get_dataloaders(cfg):
         transform = None
     train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train", transform=transform)
     val_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="val")
+    test_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="test")
 
     labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
     y_train = [cfg.dataset.mapping[label] for label in labels_train]
@@ -35,4 +36,6 @@ def get_dataloaders(cfg):
 
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=True)
 
-    return {"train": train_dataloader, "val": val_dataloader}
+    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+    return {"train": train_dataloader, "val": val_dataloader, "test": test_dataloader}
