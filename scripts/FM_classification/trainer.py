@@ -14,12 +14,8 @@ import sys
 sys.path.append(os.curdir)
 
 from scripts.utils.str_to_class import str_to_class
-from data.dataloaders import get_dataloaders
+from data.dataloaders import get_dataloaders, get_dataloaders_clips
 from scripts.utils.check_debugger import debugger_is_active
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)s] [%(levelname)s] %(message)s")
 
 
 class Trainer:
@@ -34,7 +30,6 @@ class Trainer:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(cfg.model)
         self.model = str_to_class(cfg.model.name)(**cfg.model.in_params)
         if cfg.model.load_weights.enable:
             if cfg.test.enable:
@@ -52,6 +47,7 @@ class Trainer:
         if not debugger_is_active() and cfg.logger.enable:
             wandb.watch(self.model)
         self.class_mapping = cfg.dataset.mapping
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def create_features(self, pose_sequence, name):
         if name == "distance_mat":
@@ -89,7 +85,7 @@ class Trainer:
         elif name == "basic":
             return pose_sequence[:,:,:,:2]
         else:
-            logger.error(f"Feature type {name} not found... Using basic features.")
+            self.logger.error(f"Feature type {name} not found... Using basic features.")
             return pose_sequence
         
     def one_hot_encode(self, target):
@@ -101,9 +97,10 @@ class Trainer:
         
     def train(self):
         self.model.train()
-        logger.info("Starting training...")
-        outputs = torch.zeros(len(self.train_dataloader), 3)
-        labels = torch.zeros(len(self.train_dataloader))
+        self.logger.info("Starting training...")
+        outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, 3)
+        labels = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size)
+        print(len(self.train_dataloader))
         val_losses = []
         x = np.arange(0, self._cfg.hparams.early_stopping.patience)
         val_loss = np.inf
@@ -117,20 +114,27 @@ class Trainer:
                     pose_sequence, target, count = data
                 else:
                     pose_sequence, target = data
-                
+                if len(pose_sequence.shape) == 5:
+                    B, n_samples, T, J, C = pose_sequence.shape
+                    pose_sequence = pose_sequence.view(B*n_samples, T, J, C)
+
                 label = torch.tensor([self.class_mapping[t] for t in target])
                 pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
-                labels[i] = label
+                for j in range(len(label)):
+                    labels[i*self._cfg.hparams.batch_size+j] = label[j]
+
+                assert pose_sequence.shape[0] == label.shape[0]
 
                 self.optimizer.zero_grad()
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 output = self.model(features)
-                outputs[i] = output.softmax(axis=1)
+                outputs[i:i+self._cfg.hparams.batch_size] = output.softmax(axis=1)
                 loss = self.criterion(output, label)
                 loss.backward()
                 self.optimizer.step()
+                # self.scheduler.step()
                 running_loss += loss.item()
 
                 # logger.info(f"Epoch {epoch}, batch {i}, loss: {loss.item()}")
@@ -145,7 +149,7 @@ class Trainer:
 
             train_accuracy = self.compute_accuracy(outputs, labels)
             
-            logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
+            self.logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
             if not debugger_is_active() and self._cfg.logger.enable:
                 wandb.log({"Epoch": epoch,
                     "Train Loss [epoch]": running_loss/len(self.train_dataloader),
@@ -162,7 +166,7 @@ class Trainer:
                         y = np.array(val_losses)
                         slope, _ = np.polyfit(x, y, 1)
                         if slope > self._cfg.hparams.early_stopping.slope_threshold:
-                            logger.info(f"Early stopping at epoch {epoch}.")
+                            self.logger.info(f"Early stopping at epoch {epoch}.")
                             self.save_model(epoch=epoch)
                             break
 
@@ -177,16 +181,19 @@ class Trainer:
                 self.scheduler.step()
 
             if self._cfg.logger.enable and (epoch+1) % self._cfg.model.save_period == 0:
-                self.save_model(epoch=epoch)
+                if epoch == self._cfg.hparams.epochs - 1:
+                    self.save_model()
+                else:
+                    self.save_model(epoch=epoch)
             
             running_loss = 0.0
 
-        if self._cfg.logger.enable:
-            self.save_model()
+        self.logger.info("Finished training, closing...")
+        return
 
     def validate(self, epoch):
         self.model.eval()
-        logger.info("Starting validation...")
+        self.logger.info("Starting validation...")
         outputs = torch.zeros(len(self.val_dataloader), 3)
         labels = torch.zeros(len(self.val_dataloader))
         running_val_loss = 0.0
@@ -212,8 +219,8 @@ class Trainer:
                 # correct += (predicted == label).sum().item()
 
         accuracy = self.compute_accuracy(outputs, labels)
-        logger.info(f"Accuracy of the network on the {len(self.val_dataloader)} test sequences: {100*accuracy}%")
-        logger.info(f"Validation loss: {running_val_loss/len(self.val_dataloader)}")
+        self.logger.info(f"Accuracy of the network on the {len(self.val_dataloader)} test sequences: {100*accuracy}%")
+        self.logger.info(f"Validation loss: {running_val_loss/len(self.val_dataloader)}")
         # write output to file
         if epoch == 0:
             f = open(os.path.join(self.output_dir, "validation_outputs.txt"), "w")
@@ -232,7 +239,7 @@ class Trainer:
     
     def test(self):
         self.model.eval()
-        logger.info("Starting testing...")
+        self.logger.info("Starting testing...")
         outputs = torch.zeros(len(self.test_dataloader), 3)
         labels = torch.zeros(len(self.test_dataloader))
         ids = torch.zeros(len(self.test_dataloader))
@@ -258,7 +265,7 @@ class Trainer:
                 outputs[i] = output.softmax(axis=1)
 
         accuracy = self.compute_accuracy(outputs, labels)
-        logger.info(f"Accuracy of the network on the {len(self.test_dataloader)} test sequences: {100*accuracy}%")
+        self.logger.info(f"Accuracy of the network on the {len(self.test_dataloader)} test sequences: {100*accuracy}%")
         # write output to file
         f = open(os.path.join(self.output_dir, "test_outputs.txt"), "w")
         f.write('Test outputs and labels: \n{} \n'.format(torch.cat((outputs, labels.unsqueeze(1), ids.unsqueeze(1)), 1)))

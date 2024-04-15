@@ -32,12 +32,13 @@ class AmplitudeScale:
 
 
 class RandScale:
-    def __init__(self, magnitude: int = 1, p=0.5):
+    def __init__(self, magnitude: int = 1, p=0.5, class_agnostic=False):
         factors = [1 + magnitude*0.2, 1 - magnitude*0.2]
         factor = random.choice(factors)
         temporal_scale = TemporalScale(factor, p)
         amplitude_scale = AmplitudeScale(factor, p)
         self.transform = random.choice([temporal_scale, amplitude_scale])
+        self.class_agnostic = class_agnostic
 
     def __call__(self, sample):
         return self.transform(sample)

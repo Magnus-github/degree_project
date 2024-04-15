@@ -110,8 +110,6 @@ class STTransformer(nn.Module):
         vid_cls = clip_cls.view(B, K, 3).permute(0, 2, 1).contiguous()
         vid_cls = pool(vid_cls).squeeze(dim=-1)
 
-        # vid_cls = torch.softmax(vid_cls, dim=-1)
-
         return vid_cls
 
 
