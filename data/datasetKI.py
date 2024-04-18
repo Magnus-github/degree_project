@@ -85,6 +85,15 @@ class KIDataset_dynamicClipSample(KIDataset):
         
         pose_sequence = data
 
+        id = int(pose_file.split("_")[1])
+        label = self.labels[self.ids[id]]
+
+        if self.transform and self.transform.class_agnostic:
+            pose_sequence = self.transform(pose_sequence)
+        elif self.transform and not self.transform.class_agnostic:
+            if label == "1" or label == "4":
+                pose_sequence = self.transform(pose_sequence)
+
         n_frames = pose_sequence.shape[0]
 
         pose_clips = []
@@ -104,10 +113,7 @@ class KIDataset_dynamicClipSample(KIDataset):
 
         pose_clips = np.array(pose_clips)
 
-        ratio = self.clip_length / n_frames
-
-        id = int(pose_file.split("_")[1])
-        label = self.labels[self.ids[id]]
+        # ratio = self.clip_length / n_frames
 
         return pose_clips, label
     

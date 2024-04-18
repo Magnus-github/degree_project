@@ -42,7 +42,10 @@ class Trainer:
         self.test_dataloader = dataloaders['test']
         self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
         self.optimizer = str_to_class(cfg.hparams.optimizer.name)(self.model.parameters(), **cfg.hparams.optimizer.params)
-        self.scheduler = str_to_class(cfg.hparams.scheduler.name)(self.optimizer, **cfg.hparams.scheduler.params)
+        if "Adam" in cfg.hparams.optimizer.name:
+            self.scheduler = None
+        else:
+            self.scheduler = str_to_class(cfg.hparams.scheduler.name)(self.optimizer, **cfg.hparams.scheduler.params)
         self.model.to(self.device)
         if not debugger_is_active() and cfg.logger.enable:
             wandb.watch(self.model)
@@ -98,6 +101,7 @@ class Trainer:
     def train(self):
         self.model.train()
         self.logger.info("Starting training...")
+        # num_samples = len(self.train_dataloader)*self._cfg.hparams.batch_size - 
         outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, 3)
         labels = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size)
         print(len(self.train_dataloader))
@@ -119,10 +123,9 @@ class Trainer:
                     pose_sequence = pose_sequence.view(B*n_samples, T, J, C)
 
                 label = torch.tensor([self.class_mapping[t] for t in target])
+                labels[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(label)] = label
                 pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
-                for j in range(len(label)):
-                    labels[i*self._cfg.hparams.batch_size+j] = label[j]
 
                 assert pose_sequence.shape[0] == label.shape[0]
 
@@ -130,18 +133,18 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 output = self.model(features)
-                outputs[i:i+self._cfg.hparams.batch_size] = output.softmax(axis=1)
+                outputs[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(output)] = output.softmax(axis=1)
                 loss = self.criterion(output, label)
                 loss.backward()
                 self.optimizer.step()
-                # self.scheduler.step()
+                # if self.scheduler:
+                #     self.scheduler.step()
                 running_loss += loss.item()
 
                 # logger.info(f"Epoch {epoch}, batch {i}, loss: {loss.item()}")
                 if not debugger_is_active() and self._cfg.logger.enable:
                     wandb.log({"Train Loss [batch]": loss.item()})
 
-                # self.scheduler.step()
                 if not debugger_is_active() and self._cfg.logger.enable:
                     if last_lr != self.optimizer.param_groups[0]['lr'] or i == 0:
                         last_lr = self.optimizer.param_groups[0]['lr']
@@ -174,11 +177,11 @@ class Trainer:
                         best_val_loss = val_loss
                         self.save_model(best=True)
 
-
-            if "ReduceLROnPlateau" in self._cfg.hparams.scheduler.name:
-                self.scheduler.step(running_loss/len(self.train_dataloader))
-            else:
-                self.scheduler.step()
+            if self.scheduler:
+                if "ReduceLROnPlateau" in self._cfg.hparams.scheduler.name:
+                    self.scheduler.step(running_loss/len(self.train_dataloader))
+                else:
+                    self.scheduler.step()
 
             if self._cfg.logger.enable and (epoch+1) % self._cfg.model.save_period == 0:
                 if epoch == self._cfg.hparams.epochs - 1:
@@ -303,6 +306,7 @@ if __name__ == "__main__":
     if debugger_is_active():
         cfg.hparams.epochs = 1
         cfg.hparams.validation_period = 1
+        cfg.logger.enable = False
     elif cfg.logger.enable:
         run = wandb.init(project='FM-classification', config=dict(cfg))
     else:

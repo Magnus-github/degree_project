@@ -5,10 +5,13 @@ class SGD(torch.optim.SGD):
     def __init__(self, params, lr=0, momentum=0, dampening=0, weight_decay=0, nesterov=False):
         super(SGD, self).__init__(params, lr, momentum, dampening, weight_decay, nesterov)
 
-
 class Adam(torch.optim.Adam):
     def __init__(self, params, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False):
         super(Adam, self).__init__(params, lr, betas, eps, weight_decay, amsgrad)
+
+class AdamW(torch.optim.AdamW):
+    def __init__(self, params, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01, amsgrad=False):
+        super(AdamW, self).__init__(params, lr, betas, eps, weight_decay, amsgrad)
 
 class CyclicLR(torch.optim.lr_scheduler.CyclicLR):
     def __init__(self, optimizer, base_lr=0.001, max_lr=0.006, step_size_up=2000, step_size_down=None, mode='triangular', gamma=1.0, scale_fn=None, scale_mode='cycle', cycle_momentum=True, base_momentum=0.8, max_momentum=0.9, last_epoch=-1):

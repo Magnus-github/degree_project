@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="config/train.yaml")
     args = parser.parse_args()
     cfg = OmegaConf.load(args.config)
-
+    logger.info(cfg)
     main(cfg)
     
     # magnitude = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from torch.autograd import Variable
+from scripts.utils.str_to_class import str_to_class
 
 
 
@@ -46,7 +47,7 @@ class PositionalEncoding(nn.Module):
 
 
 class STTransformer(nn.Module):
-    def __init__(self, joint_in_channels=2, joint_hidden_channels=64, time_window=9, time_step=3, dropout=0.4):
+    def __init__(self, joint_in_channels=2, joint_hidden_channels=64, time_window=9, time_step=3, dropout=0.4, pool_method: str = None):
         super().__init__()
         print("DROPOUT", dropout)
         #x
@@ -60,6 +61,10 @@ class STTransformer(nn.Module):
         self.pe = PositionalEncoding(joint_hidden_channels, dropout=dropout)
         self.linear = nn.Linear(joint_hidden_channels, 3)
         #instance to bag
+        if pool_method == "learnable":
+            NotImplementedError
+        self.pool_method = pool_method
+
         # self.attention2 = Attention(2, joint_hidden_channels//2)
 
     def forward(self, x):
@@ -103,18 +108,19 @@ class STTransformer(nn.Module):
         # clip/instance classification
         clip_cls = self.linear(x) # [B*K, 3]
         # clip_cls = torch.softmax(clip_cls, dim=-1)
+        # max_ind = clip_cls.argmax(dim=-1).view(B, K)
 
         # bag classification using max pooling
-        # pool = nn.MaxPool1d(K)
-        pool = nn.AvgPool1d(K)
+        # pool = str_to_class(self.pool_method)(K)
+        pool = torch.nn.MaxPool1d(K)
         vid_cls = clip_cls.view(B, K, 3).permute(0, 2, 1).contiguous()
-        vid_cls = pool(vid_cls).squeeze(dim=-1)
+        vid_cls = pool(clip_cls).squeeze(dim=-1) # [B,1]
 
         return vid_cls
 
 
 if __name__ == "__main__":
-    example = torch.randn(1, 240*2, 2, 14, 14)
+    example = torch.randn(20, 240*3, 2, 14, 14)
 
     model = STTransformer()
 

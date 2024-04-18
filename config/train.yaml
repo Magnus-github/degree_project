@@ -1,6 +1,6 @@
 model:
     name: scripts.FM_classification.model:STTransformer
-    in_features: distance_mat # options: [distance_mat, kinematics(pos, vel, acc, depth)]
+    in_features: distance_mat # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
     load_weights:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
@@ -10,6 +10,7 @@ model:
         time_window: 9
         time_step: 3
         dropout: 0.6
+        pooling_method: scripts.FM_classification.model_utils:MaxPool
     save_period: 50
 dataset:
     name: data.datasetKI:KIDataset_dynamicClipSample
@@ -17,9 +18,9 @@ dataset:
         enable: true
         name: data.augmentations:RandScale
         params:
-            magnitude: 0.8 # [0, 1]
-            p: 0.6 # [0, 1]
-            class_agnostic: true
+            magnitude: 0.4 # [0, 1]
+            p: 0.9 # [0, 1]
+            class_agnostic: false
     fps: 25
     mapping: {'1': 0, '4': 1, '12': 2}
     sampling: 
@@ -38,9 +39,9 @@ hparams:
     validation_period: 1
     early_stopping:
         enable: true
-        after_epoch: 200
+        after_epoch: 500
         patience: 50
-        slope_threshold: 0.05
+        slope_threshold: 0.04
         metric: val_loss
     save_best_threshold: 0.7 # save model if val_loss is better than threshold
     criterion: 
@@ -48,9 +49,13 @@ hparams:
         params: # only used for WeightedCrossEntropyLoss
             weights: [2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
     optimizer:
-        name: scripts.FM_classification.optimizer:SGD
+        name: scripts.FM_classification.optimizer:AdamW
         params:
-            lr: 0.00025
+            lr: 0.001
+            betas: [0.9, 0.999]
+            weight_decay: 0.01
+        params_sgd:
+            lr: 0.001
             weight_decay: 0.0001
     scheduler:
         name: scripts.FM_classification.optimizer:CyclicLR
@@ -70,7 +75,7 @@ logger:
     enable: true
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    path: /local_storage/users/tibbe/models/FM
+    path: /local_storage/users/tibbe/models/FM/Adam/clip/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth
