@@ -69,20 +69,29 @@ class Trainer:
             return features
         elif name == "kinematics":
             # Compute differences for both x and y dimensions
+            t = 1 / self._cfg.dataset.fps
             diff = pose_sequence[:, 1:, :, :-1] - pose_sequence[:, :-1, :, :-1]
-            velocities = diff / (1/self._cfg.data.fps)
+            velocities = diff / t
             velocities = torch.concat([torch.zeros(velocities.shape[0], 1, velocities.shape[2], velocities.shape[3]), velocities], dim=1)
 
             # Compute diff of velocities in x and y
             diff_v = velocities[:, 1:] - velocities[:, :-1]
-            accelerations = diff_v / (1/self._cfg.data.fps)
+            accelerations = diff_v / t
             accelerations = torch.concat([torch.zeros(accelerations.shape[0], 1, accelerations.shape[2], accelerations.shape[3]), accelerations], dim=1)
 
-            # TODO: calculate depth based on amount of pixes between joints
-            depth = torch.zeros_like(pose_sequence[:,:,:,1])
+            # TODO: calculate the total distance traveled by each joint in the sequence
+            distances = torch.zeros(velocities.shape)
+            for i in range(1, pose_sequence.shape[1]):
+                distances[:, i, :, :] = distances[:, i-1, :, :] + velocities[:, i-1, :, :]*t + 0.5*accelerations[:, i-1, :, :]*t**2
+
+            # distances = np.sqrt(distances[:, :, :, 0]**2 + distances[:, :, :, 1]**2)
+            distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
 
             # shape: [B, T, J, 6]
-            features = torch.concat([pose_sequence[:,:,:,:2], velocities, accelerations], dim=3)
+            features = torch.concat([pose_sequence[:,:,:,:2], velocities, accelerations, distances], dim=3)
+            features = features.permute(0,1,3,2)
+
+            features = features.float()
 
             return features
         elif name == "basic":
@@ -92,19 +101,17 @@ class Trainer:
             return pose_sequence
         
     def one_hot_encode(self, target):
-        mapping = {'1': 0, '4': 1, '12': 2}
         one_hot = torch.zeros(len(target), 3)
         for i, t in enumerate(target):
-            one_hot[i, mapping[t]] = 1
+            one_hot[i, self.mapping[t]] = 1
         return one_hot
         
     def train(self):
         self.model.train()
         self.logger.info("Starting training...")
         # num_samples = len(self.train_dataloader)*self._cfg.hparams.batch_size - 
-        outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, 3)
+        outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, self._cfg.model.in_params.num_classes)
         labels = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size)
-        print(len(self.train_dataloader))
         val_losses = []
         x = np.arange(0, self._cfg.hparams.early_stopping.patience)
         val_loss = np.inf
@@ -124,7 +131,7 @@ class Trainer:
 
                 label = torch.tensor([self.class_mapping[t] for t in target])
                 labels[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(label)] = label
-                pose_sequence = pose_sequence.to(self.device)
+                # pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
 
                 assert pose_sequence.shape[0] == label.shape[0]
@@ -132,6 +139,7 @@ class Trainer:
                 self.optimizer.zero_grad()
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
+                features = features.to(self.device)
                 output = self.model(features)
                 outputs[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(output)] = output.softmax(axis=1)
                 loss = self.criterion(output, label)
@@ -197,7 +205,7 @@ class Trainer:
     def validate(self, epoch):
         self.model.eval()
         self.logger.info("Starting validation...")
-        outputs = torch.zeros(len(self.val_dataloader), 3)
+        outputs = torch.zeros(len(self.val_dataloader), self._cfg.model.in_params.num_classes)
         labels = torch.zeros(len(self.val_dataloader))
         running_val_loss = 0.0
         with torch.no_grad():
@@ -209,10 +217,11 @@ class Trainer:
 
                 label = torch.tensor([self.class_mapping[t] for t in target])
                 labels[i] = label
-                pose_sequence = pose_sequence.to(self.device)
+                # pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
+                features = features.to(self.device)
                 output = self.model(features)
                 outputs[i] = output.softmax(axis=1)
                 val_loss = self.criterion(output, label)
@@ -243,7 +252,7 @@ class Trainer:
     def test(self):
         self.model.eval()
         self.logger.info("Starting testing...")
-        outputs = torch.zeros(len(self.test_dataloader), 3)
+        outputs = torch.zeros(len(self.test_dataloader), self._cfg.model.in_params.num_classes)
         labels = torch.zeros(len(self.test_dataloader))
         ids = torch.zeros(len(self.test_dataloader))
         with torch.no_grad():
@@ -255,12 +264,13 @@ class Trainer:
 
                 label = torch.tensor([self.class_mapping[t] for t in target])
                 labels[i] = label
-                pose_sequence = pose_sequence.to(self.device)
+                # pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
 
                 ids[i] = id
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
+                features = features.to(self.device)
                 print(id)
                 # if i == 0:^
                 output = self.model(features)

@@ -77,6 +77,7 @@ class KIDataset_dynamicClipSample(KIDataset):
         self.sample_rate = sample_rate
         self.clip_length = clip_length
         self.stride = clip_length - max_overlap
+        print(len(self.data))
 
     def __getitem__(self, idx):
         pose_file = self.data[idx]

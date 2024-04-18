@@ -1,29 +1,29 @@
 model:
-    name: scripts.FM_classification.model:STTransformer
-    in_features: distance_mat # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
+    name: scripts.FM_classification.model:TimeFormer
+    in_features: kinematics # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
     load_weights:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
-        joint_in_channels: 2
+        joint_in_channels: 7
         joint_hidden_channels: 8
+        num_joints: 18
+        clip_len: 240
         num_classes: 2
-        time_window: 9
-        time_step: 3
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:MaxPool
     save_period: 50
 dataset:
-    name: data.datasetKI:KIDataset
+    name: data.datasetKI:KIDataset_dynamicClipSample
     transform:
         enable: true
         name: data.augmentations:RandScale
         params:
-            magnitude: 0.4 # [0, 1]
+            magnitude: 0.5 # [0, 1]
             p: 0.9 # [0, 1]
             class_agnostic: false
     fps: 25
-    mapping: {'1': 0, '4': 1, '12': 2} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
+    mapping: {'1': 0, '4': 0, '12': 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
     sampling: 
         enable: true
         method: oversampling # options: [oversampling, undersampling]
@@ -35,8 +35,8 @@ dataset:
         clip_length: 720
         max_overlap: 50
 hparams:
-    epochs: 1000
-    batch_size: 1
+    epochs: 5000
+    batch_size: 20
     validation_period: 1
     early_stopping:
         enable: true
@@ -76,7 +76,7 @@ logger:
     enable: true
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    path: /local_storage/users/tibbe/models/FM/2Class/
+    path: /local_storage/users/tibbe/models/FM/TimeFormer/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth

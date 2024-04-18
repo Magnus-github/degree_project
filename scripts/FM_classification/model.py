@@ -47,9 +47,8 @@ class PositionalEncoding(nn.Module):
 
 
 class STTransformer(nn.Module):
-    def __init__(self, joint_in_channels=2, joint_hidden_channels=64, time_window=9, time_step=3, dropout=0.4, pool_method: str = None):
+    def __init__(self, joint_in_channels=2, joint_hidden_channels=64, num_classes=3, time_window=9, time_step=3, dropout=0.4, pool_method: str = None):
         super().__init__()
-        print("DROPOUT", dropout)
         #x
         self.cnn = nn.Conv2d(joint_in_channels, joint_hidden_channels, [1,14],[1,1])
         self.tcn = nn.Conv2d(joint_hidden_channels, joint_hidden_channels, [time_window,1],[time_step,1])
@@ -59,7 +58,7 @@ class STTransformer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
         self.pe = PositionalEncoding(joint_hidden_channels, dropout=dropout)
-        self.linear = nn.Linear(joint_hidden_channels, 3)
+        self.linear = nn.Linear(joint_hidden_channels, num_classes)
         #instance to bag
         if pool_method == "learnable":
             NotImplementedError
@@ -106,15 +105,83 @@ class STTransformer(nn.Module):
         x = self.attention(x) # [B*K, c_]
 
         # clip/instance classification
-        clip_cls = self.linear(x) # [B*K, 3]
+        clip_cls = self.linear(x) # [B*K, num_classes]
         # clip_cls = torch.softmax(clip_cls, dim=-1)
         # max_ind = clip_cls.argmax(dim=-1).view(B, K)
-
+        
         # bag classification using max pooling
-        # pool = str_to_class(self.pool_method)(K)
-        pool = torch.nn.MaxPool1d(K)
-        vid_cls = clip_cls.view(B, K, 3).permute(0, 2, 1).contiguous()
-        vid_cls = pool(clip_cls).squeeze(dim=-1) # [B,1]
+        pool = str_to_class(self.pool_method)(K)
+        # pool = torch.nn.MaxPool1d(K)
+        vid_cls = clip_cls.view(B, K, clip_cls.shape[-1]).permute(0, 2, 1).contiguous()
+        vid_cls = pool(vid_cls).squeeze(dim=-1) # [B,1]
+        print(vid_cls.shape)
+
+        # TODO: INVESTIGATE THIS:
+        # It seems like i used clip_cls instead of vid_cls for the pooling operation (see if it throws error)
+        # with pool(clip_cls) the train loss went down but not with pool(vid_cls)...
+
+        # # pool = str_to_class(self.pool_method)(K)
+        # pool = torch.nn.MaxPool1d(K)
+        # vid_cls = clip_cls.view(B, K, 3).permute(0, 2, 1).contiguous()
+        # vid_cls = pool(clip_cls).squeeze(dim=-1) # [B,1]
+
+        return vid_cls
+
+
+class LearnablePositionalEncoding(nn.Module):
+    def __init__(self, d_model=64, clip_len=240):
+        super(LearnablePositionalEncoding, self).__init__()
+        self.pe = nn.Parameter(torch.randn(clip_len, d_model))
+
+    def forward(self, x):
+        return x + self.pe
+
+
+class TimeFormer(torch.nn.Module):
+    def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_joints=18, clip_len=240, num_classes=3, dropout=0.4, pool_method: str = None):
+        super(TimeFormer, self).__init__()
+        self.cnn = nn.Conv1d(joint_in_channels, joint_hidden_channels, num_joints)
+        # self.norm = nn.BatchNorm1d(joint_hidden_channels)
+        self.pe = LearnablePositionalEncoding(joint_hidden_channels, clip_len)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=4, dim_feedforward=4*joint_hidden_channels, batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
+        self.dropout = nn.Dropout(dropout)
+        self.mlp = nn.Sequential(
+            nn.Linear(joint_hidden_channels, joint_hidden_channels),
+            nn.ReLU(),
+            nn.Linear(joint_hidden_channels, num_classes)
+        )
+        self.pool_method = pool_method
+        self.clip_len = clip_len
+
+    def forward(self, x):
+        B, T, c, j = x.shape
+        # split the sequence into subsequences of length t
+        t = self.clip_len
+        x = x[:, T%t:] # cut the sequence to be divisible by t
+        K = T//t
+        x = x.view(B, K, t, c, j)
+        x = x.reshape(B*K*t,c,j)
+
+        # embed the joint dimension with CNN layer 
+        x = self.cnn(x)
+        x = F.sigmoid(x)
+        x = self.dropout(x)
+        x = x.view(B*K, t, -1)
+
+        # temporal transformer
+        BK, t, c_ = x.shape
+        x = self.pe(x)
+        x = self.transformer_encoder(x)
+        x = self.attention(x)
+        x = self.dropout(x)
+
+        clip_cls = self.mlp(x)
+
+        pool = nn.MaxPool1d(K)
+        vid_cls = clip_cls.view(B, K, -1).permute(0, 2, 1)
+        vid_cls = pool(vid_cls).squeeze(dim=-1)
 
         return vid_cls
 
