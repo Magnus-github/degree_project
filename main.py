@@ -26,7 +26,13 @@ def main(cfg: DictConfig):
         cfg.hparams.epochs = 1
         cfg.hparams.validation_period = 1
     elif cfg.logger.enable:
-        run = wandb.init(project='FM-classification_2Class', config=dict(cfg))
+        if "TimeFormer" in cfg.model.name:
+            suffix = "TimeFormer"
+        elif "STTransformer" in cfg.model.name:
+            suffix = "STTransformer"
+        else:
+            raise ValueError("Unknown model name.")
+        run = wandb.init(project=f'FM-classification_2Class_{suffix}', config=dict(cfg), entity="m46nu5")
     else:
         cfg.hparams.epochs = 25
         cfg.hparams.validation_period = 1
@@ -49,12 +55,12 @@ def main(cfg: DictConfig):
     if cfg.logger.enable:
         wandb.finish()
 
-    logger.info("Exiting...")
+    logger.info("Done!")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/train.yaml")
+    parser.add_argument("--config", type=str, default="config/train_TF.yaml")
     args = parser.parse_args()
     cfg = OmegaConf.load(args.config)
     logger.info(cfg)

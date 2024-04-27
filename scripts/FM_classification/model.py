@@ -3,9 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from torch.autograd import Variable
-from scripts.utils.str_to_class import str_to_class
+# from scripts.utils.str_to_class import str_to_class
 
-
+def str_to_class(string: str):
+    module_name, object_name = string.split(":")
+    module = __import__(module_name, fromlist=[object_name])
+    return getattr(module, object_name)
 
 class Attention(nn.Module):
     def __init__(self, in_dim, hid_dim):
@@ -47,22 +50,24 @@ class PositionalEncoding(nn.Module):
 
 
 class STTransformer(nn.Module):
-    def __init__(self, joint_in_channels=2, joint_hidden_channels=64, num_classes=3, time_window=9, time_step=3, dropout=0.4, pool_method: str = None):
+    def __init__(self, joint_in_channels=2, joint_hidden_channels=64, num_joints=14, clip_len=240, num_classes=3, time_window=9, time_step=3, dropout=0.4, pool_method: str = None):
         super().__init__()
         #x
-        self.cnn = nn.Conv2d(joint_in_channels, joint_hidden_channels, [1,14],[1,1])
+        self.cnn = nn.Conv2d(joint_in_channels, joint_hidden_channels, [1,num_joints],[1,1])
         self.tcn = nn.Conv2d(joint_hidden_channels, joint_hidden_channels, [time_window,1],[time_step,1])
         self.norm = nn.BatchNorm2d(joint_hidden_channels)
         encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=4, dim_feedforward=4*joint_hidden_channels, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         self.dropout = nn.Dropout(dropout)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
-        self.pe = PositionalEncoding(joint_hidden_channels, dropout=dropout)
+        self.pe = PositionalEncoding(joint_hidden_channels, dropout=dropout, max_len=clip_len)
         self.linear = nn.Linear(joint_hidden_channels, num_classes)
         #instance to bag
         if pool_method == "learnable":
             NotImplementedError
         self.pool_method = pool_method
+
+        self.clip_len = clip_len
 
         # self.attention2 = Attention(2, joint_hidden_channels//2)
 
@@ -70,7 +75,7 @@ class STTransformer(nn.Module):
         B, T, c, j, j_ = x.shape # Batch, num_Frames, channels, Joints, Joints
 
         # split the sequence into subsequences of length t
-        t = 240
+        t = self.clip_len
         x = x[:, T%t:] # cut the sequence to be divisible by t
         K = T//t
         x = x.view(B, K, t, c, j, j_)
@@ -92,6 +97,7 @@ class STTransformer(nn.Module):
         # # x = F.relu(x)
         # x = F.sigmoid(x)
         # x = self.dropout(x)
+        print("SIZE ", x.shape)
 
         # transformer layers
         BK, c_, t_, j = x.shape # Batch*num_Clips, hidden_channels, num_Frames/clip, Joints
@@ -138,19 +144,26 @@ class LearnablePositionalEncoding(nn.Module):
 
 
 class TimeFormer(torch.nn.Module):
-    def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_joints=18, clip_len=240, num_classes=3, dropout=0.4, pool_method: str = None):
+    def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_encoder_layers=2, num_heads=4, num_joints=18, clip_len=240, num_classes=3, dropout=0.4, pool_method: str = None):
         super(TimeFormer, self).__init__()
         self.cnn = nn.Conv1d(joint_in_channels, joint_hidden_channels, num_joints)
         # self.norm = nn.BatchNorm1d(joint_hidden_channels)
         self.pe = LearnablePositionalEncoding(joint_hidden_channels, clip_len)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=4, dim_feedforward=4*joint_hidden_channels, batch_first=True)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=num_heads, dim_feedforward=4*joint_hidden_channels, batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
         self.dropout = nn.Dropout(dropout)
+        hidden_dim_mlp = 8*joint_hidden_channels
+        if hidden_dim_mlp < 64:
+            hidden_dim_mlp = 64
         self.mlp = nn.Sequential(
-            nn.Linear(joint_hidden_channels, joint_hidden_channels),
+            nn.Linear(joint_hidden_channels, hidden_dim_mlp),
             nn.ReLU(),
-            nn.Linear(joint_hidden_channels, num_classes)
+            nn.Linear(hidden_dim_mlp, hidden_dim_mlp//2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim_mlp//2, hidden_dim_mlp//4),
+            nn.ReLU(),
+            nn.Linear(hidden_dim_mlp//4, num_classes)
         )
         self.pool_method = pool_method
         self.clip_len = clip_len
@@ -174,8 +187,11 @@ class TimeFormer(torch.nn.Module):
         BK, t, c_ = x.shape
         x = self.pe(x)
         x = self.transformer_encoder(x)
+        x = F.gelu(x)
         x = self.attention(x)
         x = self.dropout(x)
+
+        # x = x.reshape(B*K, -1)
 
         clip_cls = self.mlp(x)
 
@@ -188,7 +204,21 @@ class TimeFormer(torch.nn.Module):
 
 if __name__ == "__main__":
     example = torch.randn(20, 240*3, 2, 14, 14)
+    cfg = {"in_params":
+            {
+               "joint_in_channels": 7,
+                "joint_hidden_channels": 16,
+                "num_encoder_layers": 1,
+                "num_joints": 18,
+                "clip_len": 480,
+                "num_classes": 2,
+                "dropout": 0.6,
+                "pool_method": "scripts.FM_classification.model_utils:MaxPool"
+                }
+            }
 
-    model = STTransformer()
+    model = TimeFormer(**cfg["in_params"])
+
+    example = torch.randn(1, 4210, 7, 18)
 
     out = model(example)

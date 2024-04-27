@@ -4,7 +4,6 @@ import numpy as np
 from omegaconf import OmegaConf
 import os
 import logging
-import coloredlogs
 import wandb
 from tqdm import tqdm
 
@@ -42,7 +41,7 @@ class Trainer:
         self.test_dataloader = dataloaders['test']
         self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
         self.optimizer = str_to_class(cfg.hparams.optimizer.name)(self.model.parameters(), **cfg.hparams.optimizer.params)
-        if "Adam" in cfg.hparams.optimizer.name:
+        if "Adam" in cfg.hparams.optimizer.name and cfg.hparams.optimizer.use_scheduler is False:
             self.scheduler = None
         else:
             self.scheduler = str_to_class(cfg.hparams.scheduler.name)(self.optimizer, **cfg.hparams.scheduler.params)
@@ -140,13 +139,14 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
+                print(features.shape)
                 output = self.model(features)
                 outputs[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(output)] = output.softmax(axis=1)
                 loss = self.criterion(output, label)
                 loss.backward()
                 self.optimizer.step()
-                # if self.scheduler:
-                #     self.scheduler.step()
+                if self.scheduler:
+                    self.scheduler.step()
                 running_loss += loss.item()
 
                 # logger.info(f"Epoch {epoch}, batch {i}, loss: {loss.item()}")
@@ -185,11 +185,11 @@ class Trainer:
                         best_val_loss = val_loss
                         self.save_model(best=True)
 
-            if self.scheduler:
-                if "ReduceLROnPlateau" in self._cfg.hparams.scheduler.name:
-                    self.scheduler.step(running_loss/len(self.train_dataloader))
-                else:
-                    self.scheduler.step()
+            # if self.scheduler:
+            #     if "ReduceLROnPlateau" in self._cfg.hparams.scheduler.name:
+            #         self.scheduler.step(running_loss/len(self.train_dataloader))
+            #     else:
+            #         self.scheduler.step()
 
             if self._cfg.logger.enable and (epoch+1) % self._cfg.model.save_period == 0:
                 if epoch == self._cfg.hparams.epochs - 1:
@@ -198,6 +198,8 @@ class Trainer:
                     self.save_model(epoch=epoch)
             
             running_loss = 0.0
+
+        self.save_model()
 
         self.logger.info("Finished training, closing...")
         return
@@ -222,6 +224,7 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
+                print(features.shape)
                 output = self.model(features)
                 outputs[i] = output.softmax(axis=1)
                 val_loss = self.criterion(output, label)

@@ -6,13 +6,15 @@ model:
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
         joint_in_channels: 7
-        joint_hidden_channels: 8
+        joint_hidden_channels: 128
+        num_encoder_layers: 1
+        num_heads: 1
         num_joints: 18
-        clip_len: 240
+        clip_len: 375
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:MaxPool
-    save_period: 50
+    save_period: 0.1
 dataset:
     name: data.datasetKI:KIDataset_dynamicClipSample
     transform:
@@ -35,22 +37,23 @@ dataset:
         clip_length: 720
         max_overlap: 50
 hparams:
-    epochs: 5000
-    batch_size: 20
+    epochs: 1000
+    batch_size: 24
     validation_period: 1
     early_stopping:
-        enable: true
-        after_epoch: 500
+        enable: false
+        after_epoch: 100
         patience: 50
-        slope_threshold: 0.04
+        slope_threshold: 0.01
         metric: val_loss
-    save_best_threshold: 0.7 # save model if val_loss is better than threshold
+    save_best_threshold: 0.5 # save model if val_loss is better than threshold
     criterion: 
         name: scripts.FM_classification.loss:CrossEntropyLoss
         params: # only used for WeightedCrossEntropyLoss
             weights: [2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
     optimizer:
         name: scripts.FM_classification.optimizer:AdamW
+        use_scheduler: true
         params:
             lr: 0.001
             betas: [0.9, 0.999]
@@ -59,8 +62,21 @@ hparams:
             lr: 0.001
             weight_decay: 0.0001
     scheduler:
-        name: scripts.FM_classification.optimizer:CyclicLR
+        name: scripts.FM_classification.optimizer:CosineDecayWithWarmUpScheduler
         params:
+            step_per_epoch: 8
+            init_warmup_lr: 0.0005
+            warm_up_steps: 1600 # 20 epochs
+            max_lr: 0.001
+            min_lr: 0.0005
+            num_step_down: 2500 # 300 epochs
+            num_step_up: 0 # None (empty is none)
+            T_mul: 1
+            max_lr_decay: Exp
+            gamma: 0.5
+            min_lr_decay: Exp
+            alpha: 0.5
+        params_cyclic:
             base_lr: 0.001
             max_lr: 0.001
             step_size_up: 400

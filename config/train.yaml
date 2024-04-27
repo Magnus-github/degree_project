@@ -7,12 +7,14 @@ model:
     in_params:
         joint_in_channels: 2
         joint_hidden_channels: 8
+        num_joints: 14
+        clip_len: 480
         num_classes: 2
         time_window: 9
         time_step: 3
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:MaxPool
-    save_period: 50
+    save_period: 0.1
 dataset:
     name: data.datasetKI:KIDataset
     transform:
