@@ -1,6 +1,6 @@
 model:
     name: scripts.FM_classification.model:TimeFormer
-    in_features: kinematics # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
+    in_features: kinematics_acc # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
     load_weights:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
@@ -8,9 +8,9 @@ model:
         joint_in_channels: 7
         joint_hidden_channels: 128
         num_encoder_layers: 1
-        num_heads: 1
-        num_joints: 18
-        clip_len: 375
+        num_heads: 2
+        num_joints: 18 # options: [14, 18]
+        clip_len: 480
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:MaxPool
@@ -64,12 +64,12 @@ hparams:
     scheduler:
         name: scripts.FM_classification.optimizer:CosineDecayWithWarmUpScheduler
         params:
-            step_per_epoch: 8
+            step_per_epoch: 5
             init_warmup_lr: 0.0005
-            warm_up_steps: 1600 # 20 epochs
+            warm_up_steps: 200 # 20 epochs
             max_lr: 0.001
             min_lr: 0.0005
-            num_step_down: 2500 # 300 epochs
+            num_step_down: 500 # 300 epochs
             num_step_up: 0 # None (empty is none)
             T_mul: 1
             max_lr_decay: Exp

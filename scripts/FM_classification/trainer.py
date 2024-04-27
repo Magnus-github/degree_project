@@ -29,6 +29,12 @@ class Trainer:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        if cfg.model.in_features == "kinematics_pos":
+            self._cfg.model.in_params.joint_in_channels = 2
+        elif cfg.model.in_features == "kinematics_vel":
+            self._cfg.model.in_params.joint_in_channels = 4
+        elif cfg.model.in_features == "kinematics_acc":
+            self._cfg.model.in_params.joint_in_channels = 6
         self.model = str_to_class(cfg.model.name)(**cfg.model.in_params)
         if cfg.model.load_weights.enable:
             if cfg.test.enable:
@@ -66,7 +72,7 @@ class Trainer:
             features = features.float()
 
             return features
-        elif name == "kinematics":
+        elif "kinematics" in name:
             # Compute differences for both x and y dimensions
             t = 1 / self._cfg.dataset.fps
             diff = pose_sequence[:, 1:, :, :-1] - pose_sequence[:, :-1, :, :-1]
@@ -78,7 +84,7 @@ class Trainer:
             accelerations = diff_v / t
             accelerations = torch.concat([torch.zeros(accelerations.shape[0], 1, accelerations.shape[2], accelerations.shape[3]), accelerations], dim=1)
 
-            # TODO: calculate the total distance traveled by each joint in the sequence
+            # calculate the total distance traveled by each joint in the sequence
             distances = torch.zeros(velocities.shape)
             for i in range(1, pose_sequence.shape[1]):
                 distances[:, i, :, :] = distances[:, i-1, :, :] + velocities[:, i-1, :, :]*t + 0.5*accelerations[:, i-1, :, :]*t**2
@@ -86,13 +92,24 @@ class Trainer:
             # distances = np.sqrt(distances[:, :, :, 0]**2 + distances[:, :, :, 1]**2)
             distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
 
-            # shape: [B, T, J, 6]
+            # shape: [B, T, J, 7]
             features = torch.concat([pose_sequence[:,:,:,:2], velocities, accelerations, distances], dim=3)
             features = features.permute(0,1,3,2)
-
+            # shape: [B, T, 7, J]
             features = features.float()
 
-            return features
+            if self._cfg.model.in_params.num_joints == 14:
+                features = features[:, :, :, :14]
+
+            if name == "kinematics":
+                return features
+            elif name == "kinematics_pos":
+                return features[:,:,:2,:]
+            elif name == "kinematics_vel":
+                return features[:,:,:4,:]
+            elif name == "kinematics_acc":
+                return features[:,:,:6,:]
+
         elif name == "basic":
             return pose_sequence[:,:,:,:2]
         else:
@@ -139,7 +156,6 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
-                print(features.shape)
                 output = self.model(features)
                 outputs[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(output)] = output.softmax(axis=1)
                 loss = self.criterion(output, label)

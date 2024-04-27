@@ -75,7 +75,7 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
     path: /local_storage/users/tibbe/models/FM/2Class/
