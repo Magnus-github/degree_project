@@ -77,7 +77,6 @@ class KIDataset_dynamicClipSample(KIDataset):
         self.sample_rate = sample_rate
         self.clip_length = clip_length
         self.stride = clip_length - max_overlap
-        print(len(self.data))
 
     def __getitem__(self, idx):
         pose_file = self.data[idx]
@@ -117,6 +116,85 @@ class KIDataset_dynamicClipSample(KIDataset):
         # ratio = self.clip_length / n_frames
 
         return pose_clips, label
+    
+
+class KIDataset_representation(KIDataset):
+    def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/poses_smooth_np/",
+                 annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
+                 mode: str = "train", transform = None, seed: int = 42, feature_type: str = "distance_mat",
+                 num_frames: int = 100, fps: int = 30):
+        super().__init__(data_folder, annotations_path, mode, transform, seed)
+
+        self.feature_type = feature_type
+        self.num_frames = num_frames
+        self.fps = fps
+
+    def get_features(self, pose_sequence):
+        if self.feature_type == "distance_mat":
+            # Reshape pose_sequence to (T, J, 1, C)
+            pose_sequence_reshaped = pose_sequence.unsqueeze(2)
+            pose_sequence_reshaped = pose_sequence_reshaped[:, :14, :, :2]
+
+            # Compute absolute differences for both x and y dimensions
+            abs_diff = torch.abs(pose_sequence_reshaped - pose_sequence_reshaped.permute(0, 2, 1, 3))
+
+            # shape: [B, T, C, J, J]
+            features = abs_diff.permute(0, 3, 1, 2)
+
+            features = features.float()
+
+            return features
+
+        elif "kinematics" in self.feature_type:
+            # Compute differences for both x and y dimensions
+            t = 1 / self.fps
+            diff = pose_sequence[1:, :, :-1] - pose_sequence[:-1, :, :-1]
+            velocities = diff / t
+            velocities = torch.concat([torch.zeros(1, velocities.shape[1], velocities.shape[2]), velocities], dim=0)
+
+            # Compute diff of velocities in x and y
+            diff_v = velocities[1:] - velocities[:-1]
+            accelerations = diff_v / t
+            accelerations = torch.concat([torch.zeros(1, accelerations.shape[1], accelerations.shape[2]), accelerations], dim=0)
+
+            # calculate the total distance traveled by each joint in the sequence
+            distances = torch.zeros(velocities.shape)
+            for i in range(1, pose_sequence.shape[1]):
+                distances[i, :, :] = distances[i-1, :, :] + velocities[i-1, :, :]*t + 0.5*accelerations[i-1, :, :]*t**2
+
+            # distances = np.sqrt(distances[:, :, :, 0]**2 + distances[:, :, :, 1]**2)
+            distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
+
+            # shape: [T, J, 7]
+            features = torch.concat([pose_sequence[:,:,:2], velocities, accelerations, distances], dim=-1)
+            features = features.permute(0,2,1)
+            # shape: [T, 7, J]
+            features = features.float()
+
+            return features
+
+    def __getitem__(self, idx):
+        pose_file = self.data[idx]
+        with open(os.path.join(self.data_folder, pose_file), 'rb') as file:
+            data = np.load(file)
+        
+        pose_sequence = data
+
+        id = int(pose_file.split("_")[1])
+        label = self.labels[self.ids[id]]
+
+        if self.transform and self.transform.class_agnostic:
+            pose_sequence = self.transform(pose_sequence)
+        elif self.transform and not self.transform.class_agnostic:
+            if label == "1" or label == "4":
+                pose_sequence = self.transform(pose_sequence)
+
+        features = self.get_features(torch.tensor(pose_sequence))
+
+        random_indices = torch.randperm(features.shape[0])[:self.num_frames]
+        features = features[random_indices]
+
+        return features
     
 
 class KIDataset_clips(KIDataset):
@@ -182,7 +260,7 @@ if __name__ == "__main__":
         label_lst.append(mapping[label[0]])
         seq_lens.append(T)
 
-        print(pose_sequence.shape, label)
+        # print(pose_sequence.shape, label)
 
         # fig, axs = plt.subplots(J, 1, figsize=(15, 5*J))
         # for joint in range(J):
@@ -192,9 +270,6 @@ if __name__ == "__main__":
         #     axs[joint].legend()
         
         # plt.savefig(f'data/pose_augmented{i}.png')
-
-        if i == 10:
-            break
 
         # Reshape pose_sequence to (B, T, J, 1, C)
         # pose_sequence_reshaped = pose_sequence.unsqueeze(3)

@@ -9,7 +9,7 @@ model:
         joint_hidden_channels: 128
         num_encoder_layers: 1
         num_heads: 2
-        num_joints: 18 # options: [14, 18]
+        num_joints: 14 # options: [14, 18]
         clip_len: 480
         num_classes: 2
         dropout: 0.6

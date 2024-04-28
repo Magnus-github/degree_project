@@ -1,0 +1,27 @@
+dataset:
+    name: data.datasetKI:KIDataset_representation
+    transform:
+        enable: false
+        name: data.augmentations:RandScale
+        params:
+            magnitude: 0.5 # [0, 1]
+            p: 0.9 # [0, 1]
+            class_agnostic: false
+    mapping: {'1': 0, '4': 0, '12': 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
+    sampling: 
+        enable: true
+        method: oversampling # options: [oversampling, undersampling]
+    params:
+        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
+        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        feature_type: "kinematics"
+        fps: 25
+    params_clips:
+        sample_rate: 1
+        clip_length: 720
+        max_overlap: 50
+hparams:
+    epochs: 100
+    batch_size: 24
+    validation_period: 1
+    lr: 0.0005
