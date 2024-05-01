@@ -1,6 +1,9 @@
 model:
     name: scripts.FM_classification.model:TimeFormer
     in_features: kinematics_acc # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
+    histogram:
+        enable: true
+        num_bins: 10
     load_weights:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
@@ -30,8 +33,10 @@ dataset:
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
-        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        # data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
+        data_folder: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/
+        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        annotations_path: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv
     params_clips:
         sample_rate: 1
         clip_length: 720
@@ -89,10 +94,10 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
 outputs:
-    # path: /Midgard/Data/tibbe/models/FM
-    path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    # path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    path: /Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/output
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth

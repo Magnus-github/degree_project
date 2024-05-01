@@ -14,6 +14,7 @@ sys.path.append(os.curdir)
 
 from scripts.utils.str_to_class import str_to_class
 from data.dataloaders import get_dataloaders, get_dataloaders_clips
+from scripts.FM_classification.model_utils import HistogramFeatures
 from scripts.utils.check_debugger import debugger_is_active
 
 
@@ -101,6 +102,10 @@ class Trainer:
             if self._cfg.model.in_params.num_joints == 14:
                 features = features[:, :, :, :14]
 
+            if self._cfg.model.histogram.enable:
+                histogram_features = HistogramFeatures(self._cfg.model.histogram.num_bins)
+                features = histogram_features(features)
+
             if name == "kinematics":
                 return features
             elif name == "kinematics_pos":
@@ -109,6 +114,7 @@ class Trainer:
                 return features[:,:,:4,:]
             elif name == "kinematics_acc":
                 return features[:,:,:6,:]
+            
 
         elif name == "basic":
             return pose_sequence[:,:,:,:2]
