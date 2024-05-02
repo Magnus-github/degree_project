@@ -240,7 +240,6 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
-                print(features.shape)
                 output = self.model(features)
                 outputs[i] = output.softmax(axis=1)
                 val_loss = self.criterion(output, label)

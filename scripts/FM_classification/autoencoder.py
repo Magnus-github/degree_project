@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 from omegaconf import OmegaConf
+from tqdm import tqdm
 
 import os
 import sys
@@ -22,6 +23,9 @@ class LearnablePositionalEncoding(nn.Module):
 class SpatialAutoencoder(torch.nn.Module):
     def __init__(self, input_dim: int = 126):
         super(SpatialAutoencoder, self).__init__()
+
+        
+
         
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, 64),
@@ -29,13 +33,13 @@ class SpatialAutoencoder(torch.nn.Module):
             nn.Linear(64, 32),
             nn.ReLU(),
             nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 4)
+            # nn.ReLU(),
+            # nn.Linear(16, 4)
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(4, 16),
-            nn.ReLU(),
+            # nn.Linear(4, 16),
+            # nn.ReLU(),
             nn.Linear(16, 32),
             nn.ReLU(),
             nn.Linear(32, 64),
@@ -70,7 +74,7 @@ def train_spatial_autoencoder():
 
     for epoch in range(epochs):
         running_loss = 0.0
-        for i, data in enumerate(train_loader, 0):
+        for i, data in enumerate(tqdm(train_loader)):
             inputs = data
             inputs = inputs.to(device)
             optimizer.zero_grad()
@@ -80,6 +84,17 @@ def train_spatial_autoencoder():
             optimizer.step()
             running_loss += loss.item()
         print(f'Epoch {epoch+1}, loss: {running_loss/len(train_loader)}')
+
+        model.eval()
+        running_val_loss = 0.0
+        with torch.no_grad():
+            for i, data in enumerate(tqdm(val_loader)):
+                inputs = data
+                inputs = inputs.to(device)
+                outputs = model(inputs)
+                loss = criterion(outputs, inputs)
+                running_val_loss += loss.item()
+            print(f'Epoch {epoch+1}, val_loss: {running_val_loss/len(val_loader)}')
     print('Finished Training')
     return model
 

@@ -21,7 +21,7 @@ dataset:
         clip_length: 720
         max_overlap: 50
 hparams:
-    epochs: 100
+    epochs: 1000
     batch_size: 24
     validation_period: 1
     lr: 0.0005

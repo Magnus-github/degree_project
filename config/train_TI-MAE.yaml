@@ -1,0 +1,68 @@
+model:
+    name: scripts.FM_classification.TI-MAE:TI_MAE
+    params:
+        in_dim: 1 # 126 # 7*18
+        enc_embed_dim: 64
+        seq_len: 240
+        mask_ratio: 0.75
+        enc_num_heads: 4
+        enc_num_layers: 2
+        dec_embed_dim: 32
+        dec_num_heads: 4
+        dec_num_layers: 2
+        dropout: 0.1
+dataset:
+    name: data.datasetKI:KIDataset_dynamicClipSample
+    transform:
+        enable: false
+        name: data.augmentations:RandScale
+        params:
+            magnitude: 0.5 # [0, 1]
+            p: 0.9 # [0, 1]
+            class_agnostic: false
+    fps: 25
+    mapping: {'1': 0, '4': 1, '12': 2} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
+    sampling: 
+        enable: true
+        method: oversampling # options: [oversampling, undersampling]
+    params:
+        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
+        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+    params_clips:
+        sample_rate: 4
+        clip_length: 240
+        max_overlap: 50
+hparams:
+    epochs: 10
+    batch_size: 1
+    learning_rate: 0.001
+    optimizer:
+        name: torch.optim:Adam
+        params:
+            lr: 0.001
+            betas: [0.9, 0.999]
+            weight_decay: 0.01
+    scheduler:
+        name: scripts.FM_classification.optimizer:CosineDecayWithWarmUpScheduler
+        params:
+            step_per_epoch: 5
+            init_warmup_lr: 0.0005
+            warm_up_steps: 200 # 20 epochs
+            max_lr: 0.001
+            min_lr: 0.0005
+            num_step_down: 500 # 300 epochs
+            num_step_up: 0 # None (empty is none)
+            T_mul: 1
+            max_lr_decay: Exp
+            gamma: 0.5
+            min_lr_decay: Exp
+            alpha: 0.5
+    criterion:
+        name: torch.nn:MSELoss
+    validation_period: 1
+    early_stopping:
+        enable: false
+        after_epoch: 100
+        patience: 50
+        slope_threshold: 0.01
+        metric: val_loss
