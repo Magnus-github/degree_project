@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import Dataset
 import csv
 import numpy as np
+import matplotlib.pyplot as plt
 import os
 import time
 from tqdm import tqdm
@@ -252,6 +253,15 @@ class KI_Dataset_VAE(KIDataset):
             features = features.float()
 
             features = features[:, :4]
+
+            # fig, axs = plt.subplots(18, 4, figsize=(15, 5*18))
+            # for i in range(4):
+            #     for j in range(18):
+            #         axs[j, i].plot(features[:, i, j])
+            #         axs[j, i].set_title(f'Joint {j} - {["x", "y", "v_x", "v_y"][i]}')
+            # outdir = "output/debugging/features/"
+            # plt.savefig(f"{outdir}kinematics_full_{sum('full' in f for f in os.listdir(outdir))}.png")
+
             for i in range(0, features.shape[1]):
                 # min-max normalization
                 features[:, i] = (features[:, i] - features[:, i].min()) / (features[:, i].max() - features[:, i].min())*(1-(-1)) + (-1)
@@ -276,12 +286,13 @@ class KI_Dataset_VAE(KIDataset):
 
         features = self.get_features(torch.tensor(pose_sequence))
 
-        features = features.unfold(0, self.sample_len, self.stride)
+        features_unfold = features.unfold(0, self.sample_len, self.stride)
 
         # features = features.reshape(features.shape[0], features.shape[1], -1)
-        features = features.reshape(features.shape[0], -1)
+        features_unfold = features_unfold.reshape(features_unfold.shape[0], -1)
 
-        return features
+
+        return features_unfold
 
 class KIDataset_clips(KIDataset):
     def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/clips_smooth_np/",

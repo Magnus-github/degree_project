@@ -18,8 +18,10 @@ dataset:
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
-        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        # data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
+        data_folder: /Volumes/USB3/thesis/data/poses_smooth_np/
+        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        annotations_path: /Volumes/USB3/thesis/data/annotations.csv
         feature_type: "kinematics"
         sample_len: 5
         stride: 1
@@ -49,6 +51,7 @@ hparams:
             gamma: 0.5
             min_lr_decay: Exp
             alpha: 0.5
-save_path: /local_storage/users/tibbe/models/VAE/
+# save_path: /local_storage/users/tibbe/models/VAE/
+save_path: /Volumes/USB3/thesis/models/VAE/
 wandb:
     enable: false
