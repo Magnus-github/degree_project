@@ -7,13 +7,14 @@ import coloredlogs
 
 from data.dataloaders import get_dataloaders, get_dataloaders_clips
 from scripts.FM_classification.trainer import Trainer
+from scripts.FM_classification.pretraining import Trainer as Pretrainer
 from scripts.utils.check_debugger import debugger_is_active
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)s] [%(levelname)s] %(message)s")
 
-def main(cfg: DictConfig):
+def train(cfg: DictConfig):
     if cfg.test.enable:
         cfg.logger.enable = False
 
@@ -58,13 +59,59 @@ def main(cfg: DictConfig):
     logger.info("Done!")
 
 
+def pretrain(cfg: DictConfig):
+    # if cfg.test.enable:
+    #     cfg.logger.enable = False
+
+    dataloaders = get_dataloaders(cfg)
+
+    if debugger_is_active():
+        cfg.hparams.epochs = 1
+        cfg.hparams.validation_period = 1
+    elif cfg.wandb.enable:
+        if "VAE" in cfg.model.name:
+            suffix = "VAE"
+        else:
+            raise ValueError("Unknown model name.")
+        run = wandb.init(project=f'Pretraining_{suffix}', config=dict(cfg), entity="m46nu5")
+    else:
+        cfg.hparams.epochs = 25
+        cfg.hparams.validation_period = 1
+
+    run_id = run.name if cfg.wandb.enable else None
+    # if cfg.test.enable:
+    #     cfg.model.load_weights.enable = True
+    #     cfg.model.in_params.dropout = 0.0
+    
+    logger.info("Instantiating Trainer...")
+    pretrainer = Pretrainer(cfg, dataloaders, run_id=run_id)
+
+    # if cfg.test.enable:
+    #     pretrainer.test()
+    #     logger.info("Testing finished.")
+    # else:
+    #     pretrainer.train()
+    #     logger.info("Pretraining finished."
+    
+    pretrainer.train()
+
+    if cfg.wandb.enable:
+        wandb.finish()
+
+    logger.info("Done!")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/train_TF.yaml")
+    parser.add_argument("--config", type=str, default="config/train_AE.yaml")
     args = parser.parse_args()
     cfg = OmegaConf.load(args.config)
     logger.info(cfg)
-    main(cfg)
+
+    if "VAE" in cfg.model.name:
+        pretrain(cfg)
+    else:    
+        train(cfg)
     
     # magnitude = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     # probs = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]

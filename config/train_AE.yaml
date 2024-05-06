@@ -1,5 +1,11 @@
+model:
+    name: scripts.FM_classification.VanillaVAE:VanillaVAE
+    params:
+        in_dim: 360 # 4*18*5
+        latent_dim: 32
+        hidden_dim: 3
 dataset:
-    name: data.datasetKI:KIDataset_representation
+    name: data.datasetKI:KI_Dataset_VAE
     transform:
         enable: false
         name: data.augmentations:RandScale
@@ -15,13 +21,34 @@ dataset:
         data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
         annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
         feature_type: "kinematics"
+        sample_len: 5
+        stride: 1
         fps: 25
-    params_clips:
-        sample_rate: 1
-        clip_length: 720
-        max_overlap: 50
 hparams:
-    epochs: 1000
-    batch_size: 24
+    epochs: 200
+    batch_size: 1
     validation_period: 1
-    lr: 0.0005
+    optimizer:
+        name: torch.optim:Adam
+        params:
+            lr: 0.0025
+            betas: [0.9, 0.999]
+            weight_decay: 0.01
+    scheduler:
+        name: scripts.FM_classification.optimizer:CosineDecayWithWarmUpScheduler
+        params:
+            step_per_epoch: 120
+            init_warmup_lr: 0.001
+            warm_up_steps: 600 # 20 epochs
+            max_lr: 0.0075
+            min_lr: 0.001
+            num_step_down: 24000 # 300 epochs
+            num_step_up: 0 # None (empty is none)
+            T_mul: 1
+            max_lr_decay: Exp
+            gamma: 0.5
+            min_lr_decay: Exp
+            alpha: 0.5
+save_path: /local_storage/users/tibbe/models/VAE/
+wandb:
+    enable: false

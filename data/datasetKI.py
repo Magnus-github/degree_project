@@ -195,7 +195,93 @@ class KIDataset_representation(KIDataset):
         features = features[random_indices]
 
         return features
-    
+
+
+class KI_Dataset_VAE(KIDataset):
+    def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/poses_smooth_np/",
+                 annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
+                 mode: str = "train", transform = None, seed: int = 42, feature_type: str = "kinematics",
+                 sample_len: int = 5, stride: int = 1, fps: int = 25):
+        super().__init__(data_folder, annotations_path, mode, transform, seed)
+
+        self.feature_type = feature_type
+        self.sample_len = sample_len
+        self.stride = stride
+        self.fps = fps
+
+    def get_features(self, pose_sequence):
+        if self.feature_type == "distance_mat":
+            # Reshape pose_sequence to (T, J, 1, C)
+            pose_sequence_reshaped = pose_sequence.unsqueeze(2)
+            pose_sequence_reshaped = pose_sequence_reshaped[:, :14, :, :2]
+
+            # Compute absolute differences for both x and y dimensions
+            abs_diff = torch.abs(pose_sequence_reshaped - pose_sequence_reshaped.permute(0, 2, 1, 3))
+
+            # shape: [B, T, C, J, J]
+            features = abs_diff.permute(0, 3, 1, 2)
+
+            features = features.float()
+
+            return features
+
+        elif "kinematics" in self.feature_type:
+            # Compute differences for both x and y dimensions
+            t = 1 / self.fps
+            diff = pose_sequence[1:, :, :-1] - pose_sequence[:-1, :, :-1]
+            velocities = diff / t
+            velocities = torch.concat([torch.zeros(1, velocities.shape[1], velocities.shape[2]), velocities], dim=0)
+
+            # Compute diff of velocities in x and y
+            diff_v = velocities[1:] - velocities[:-1]
+            accelerations = diff_v / t
+            accelerations = torch.concat([torch.zeros(1, accelerations.shape[1], accelerations.shape[2]), accelerations], dim=0)
+
+            # calculate the total distance traveled by each joint in the sequence
+            distances = torch.zeros(velocities.shape)
+            for i in range(1, pose_sequence.shape[1]):
+                distances[i, :, :] = distances[i-1, :, :] + velocities[i-1, :, :]*t + 0.5*accelerations[i-1, :, :]*t**2
+
+            # distances = np.sqrt(distances[:, :, :, 0]**2 + distances[:, :, :, 1]**2)
+            distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
+
+            # shape: [T, J, 7]
+            features = torch.concat([pose_sequence[:,:,:2], velocities, accelerations, distances], dim=-1)
+            features = features.permute(0,2,1)
+            # shape: [T, 7, J]
+            features = features.float()
+
+            features = features[:, :4]
+            for i in range(0, features.shape[1]):
+                # min-max normalization
+                features[:, i] = (features[:, i] - features[:, i].min()) / (features[:, i].max() - features[:, i].min())*(1-(-1)) + (-1)
+
+            return features
+
+    def __getitem__(self, idx):
+        pose_file = self.data[idx]
+        with open(os.path.join(self.data_folder, pose_file), 'rb') as file:
+            data = np.load(file)
+        
+        pose_sequence = data
+
+        id = int(pose_file.split("_")[1])
+        label = self.labels[self.ids[id]]
+
+        if self.transform and self.transform.class_agnostic:
+            pose_sequence = self.transform(pose_sequence)
+        elif self.transform and not self.transform.class_agnostic:
+            if label == "1" or label == "4":
+                pose_sequence = self.transform(pose_sequence)
+
+        features = self.get_features(torch.tensor(pose_sequence))
+
+        features = features.unfold(0, self.sample_len, self.stride)
+
+        # features = features.reshape(features.shape[0], features.shape[1], -1)
+        features = features.reshape(features.shape[0], -1)
+
+        return features
 
 class KIDataset_clips(KIDataset):
     def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/clips_smooth_np/",
@@ -233,7 +319,7 @@ if __name__ == "__main__":
     # data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
     annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
     # annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
-    d_train = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="train")
+    d_train = KI_Dataset_VAE(data_folder=data_folder, annotations_path=annotations_path, mode="train")
     d_val = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="val")
 
 
@@ -298,4 +384,4 @@ if __name__ == "__main__":
     classes = np.unique(label_lst)
     class_weights = compute_class_weight(class_weight='balanced', classes=classes, y=label_lst)
     print(f"Class weights: {class_weights}")
-
+    
