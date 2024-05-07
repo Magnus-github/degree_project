@@ -68,6 +68,7 @@ def pretrain(cfg: DictConfig):
     if debugger_is_active():
         cfg.hparams.epochs = 1
         cfg.hparams.validation_period = 1
+        cfg.wandb.enable = False
     elif cfg.wandb.enable:
         if "VAE" in cfg.model.name:
             suffix = "VAE"

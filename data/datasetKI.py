@@ -201,20 +201,24 @@ class KIDataset_representation(KIDataset):
 class KI_Dataset_VAE(KIDataset):
     def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/poses_smooth_np/",
                  annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
+                 max_path: str="data/means.npy", min_path: str="data/stds.npy",
                  mode: str = "train", transform = None, seed: int = 42, feature_type: str = "kinematics",
-                 sample_len: int = 5, stride: int = 1, fps: int = 25):
+                 sample_len: int = 5, stride: int = 1, fps: int = 25, diff_step: int = 2):
         super().__init__(data_folder, annotations_path, mode, transform, seed)
 
+        self.maxs = np.load(max_path)
+        self.mins = np.load(min_path)
         self.feature_type = feature_type
         self.sample_len = sample_len
         self.stride = stride
         self.fps = fps
+        self.diff_step = diff_step
 
     def get_features(self, pose_sequence):
         if self.feature_type == "distance_mat":
             # Reshape pose_sequence to (T, J, 1, C)
             pose_sequence_reshaped = pose_sequence.unsqueeze(2)
-            pose_sequence_reshaped = pose_sequence_reshaped[:, :14, :, :2]
+            pose_sequence_reshaped = pose_sequence_reshaped[:, :14]
 
             # Compute absolute differences for both x and y dimensions
             abs_diff = torch.abs(pose_sequence_reshaped - pose_sequence_reshaped.permute(0, 2, 1, 3))
@@ -228,12 +232,11 @@ class KI_Dataset_VAE(KIDataset):
 
         elif "kinematics" in self.feature_type:
             # Compute differences for both x and y dimensions
-            diff_step = 2
-            t = diff_step / self.fps
-            diff = pose_sequence[diff_step:, :, :-1] - pose_sequence[:-diff_step, :, :-1]
+            t = self.diff_step / self.fps
+            diff = pose_sequence[self.diff_step:] - pose_sequence[:-self.diff_step]
             velocities = diff / t
 
-            velocities = torch.concat([torch.zeros(1, velocities.shape[1], velocities.shape[2]), velocities], dim=0)
+            # velocities = torch.concat([torch.zeros(1, velocities.shape[1], velocities.shape[2]), velocities], dim=0)
 
             # Compute diff of velocities in x and y
             # diff_v = velocities[1:] - velocities[:-1]
@@ -250,7 +253,7 @@ class KI_Dataset_VAE(KIDataset):
 
             # shape: [T, J, 7]
             # features = torch.concat([pose_sequence[:,:,:2], velocities, accelerations, distances], dim=-1)
-            features = torch.concat([pose_sequence[diff_step:,:,:2], velocities], dim=-1)
+            features = torch.concat([pose_sequence[self.diff_step:], velocities], dim=-1)
             features = features.permute(0,2,1)
             # shape: [T, 7, J]
             features = features.float()
@@ -263,9 +266,9 @@ class KI_Dataset_VAE(KIDataset):
             # outdir = "output/debugging/features/"
             # plt.savefig(f"{outdir}kinematics_full_{sum('full' in f for f in os.listdir(outdir))}.png")
 
-            for i in range(0, features.shape[1]):
-                # min-max normalization
-                features[:, i] = (features[:, i] - features[:, i].min()) / (features[:, i].max() - features[:, i].min())*(1-(-1)) + (-1)
+            # for i in range(0, features.shape[1]):
+            #     # min-max normalization
+            #     features[:, i] = (features[:, i] - features[:, i].min()) / (features[:, i].max() - features[:, i].min())*(1-(-1)) + (-1)
 
             return features
 
@@ -285,13 +288,17 @@ class KI_Dataset_VAE(KIDataset):
             if label == "1" or label == "4":
                 pose_sequence = self.transform(pose_sequence)
 
-        features = self.get_features(torch.tensor(pose_sequence))
+        normalized_pose_sequence = ((pose_sequence[:,:,:2] - self.mins) / (self.maxs - self.mins)).clip(-1, 1)
+
+        # features = self.get_features(torch.tensor(normalized_pose_sequence))
+        features = torch.tensor(normalized_pose_sequence).permute(0, 2, 1).float()
+
+        features = features[:,:,2:14] # only arms and legs
 
         features_unfold = features.unfold(0, self.sample_len, self.stride)
 
         # features = features.reshape(features.shape[0], features.shape[1], -1)
         features_unfold = features_unfold.reshape(features_unfold.shape[0], -1)
-
 
         return features_unfold
 

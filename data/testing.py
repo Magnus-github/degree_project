@@ -94,7 +94,56 @@ def main():
 
         print(pose_file.split('_')[1])
         print(frequency_range)
+
+
+from omegaconf import OmegaConf
+
+def get_dataset_mean_and_std():
+    data_folder = "/Volumes/USB3/thesis/data/poses_smooth_np/"
+    means = []
+    stds = []
+    for pose_file in os.listdir(data_folder):
+        with open(os.path.join(data_folder, pose_file), 'rb') as file:
+                data = np.load(file)
         
+        pose_sequence = data
+
+        means.append(np.mean(pose_sequence[:,:,:2], axis=0))
+        stds.append(np.std(pose_sequence[:,:,:2], axis=0))
+        
+    means = np.array(means)
+    stds = np.array(stds)
+
+    mean = np.mean(means, axis=0)
+    std = np.mean(stds, axis=0)
+
+    np.save('data/means.npy', mean)
+    np.save('data/stds.npy', std)
+
+
+def get_dataset_max_min():
+    data_folder = "/Volumes/USB3/thesis/data/poses_smooth_np/"
+    maxs = []
+    mins = []
+    for pose_file in os.listdir(data_folder):
+        with open(os.path.join(data_folder, pose_file), 'rb') as file:
+                data = np.load(file)
+        
+        pose_sequence = data
+
+        maxs.append(np.max(pose_sequence[:,:,:2], axis=0))
+        mins.append(np.min(pose_sequence[:,:,:2], axis=0))
+
+    maxs = np.array(maxs)
+    mins = np.array(mins)
+
+    max = np.mean(maxs, axis=0)
+    min = np.mean(mins, axis=0)
+
+    np.save('data/maxs.npy', max)
+    np.save('data/mins.npy', min)
+
+
 
     # factors = np.linspace(0.5, 2, 16)
 
@@ -106,4 +155,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    get_dataset_max_min()
