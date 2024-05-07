@@ -145,3 +145,62 @@ class VanillaVAE(BaseVAE):
         return self.forward(x)[0]
 
 
+
+class VanillaAE:
+    def __init__(self, in_dim, hidden_dim, latent_dim) -> None:
+        super(VanillaAE, self).__init__()
+
+        self.encoder = nn.Sequential(nn.Linear(in_dim, 8*hidden_dim),
+                                     nn.ReLU(),
+                                     nn.Linear(8*hidden_dim, 4*hidden_dim),
+                                     nn.ReLU(),
+                                     nn.Linear(4*hidden_dim, 2*hidden_dim),
+                                     nn.ReLU(),
+                                     nn.Linear(2*hidden_dim, hidden_dim),
+                                     nn.ReLU(),
+                                    )
+        
+        self.project = nn.Linear(hidden_dim, latent_dim)
+
+        self.decoder_input = nn.Linear(latent_dim, hidden_dim)
+
+        self.decoder = nn.Sequential(nn.Linear(hidden_dim, 2*hidden_dim),
+                                     nn.ReLU(),
+                                     nn.Linear(2*hidden_dim, 4*hidden_dim),
+                                     nn.ReLU(),
+                                     nn.Linear(4*hidden_dim, 8*hidden_dim),
+                                     nn.ReLU(),
+                                     nn.Linear(8*hidden_dim, in_dim),
+                                     nn.Tanh(),
+                                    )
+        
+
+    def encode(self, input):
+        """
+        Encodes the input by passing through the encoder network
+        and returns the latent codes.
+        :param input: (Tensor) Input tensor to encoder [B, N*J*C*t]
+        :return: (Tensor) List of latent codes
+        """
+        result = self.encoder(input)
+        return self.project(result)
+    
+    def decode(self, z):
+        """
+        Maps the given latent codes
+        onto the image space.
+        :param z: (Tensor) [B, D]
+        :return: (Tensor) [B, N*J*C*t]
+        """
+        result = self.decoder_input(z)
+        result = self.decoder(result)        
+
+        return result
+    
+    def forward(self, input, **kwargs):
+        z = self.encode(input)
+        pred = self.decode(z)
+        return  {'pred': pred, 'Z': z}
+    
+    def loss_function(self,input, pred):
+        return F.mse_loss(pred, input)
