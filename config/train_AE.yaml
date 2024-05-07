@@ -32,6 +32,7 @@ dataset:
 hparams:
     epochs: 200
     batch_size: 1
+    orig_dim: [2, 12, 5]
     validation_period: 1
     optimizer:
         name: torch.optim:Adam
