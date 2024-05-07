@@ -18,9 +18,7 @@ class VanillaVAE(BaseVAE):
         self.latent_dim = latent_dim
         self.beta = beta if beta is not None else 1
 
-        self.encoder = nn.Sequential(nn.Linear(in_dim, 8*hidden_dim),
-                                     nn.ReLU(),
-                                     nn.Linear(8*hidden_dim, 4*hidden_dim),
+        self.encoder = nn.Sequential(nn.Linear(in_dim, 4*hidden_dim),
                                      nn.ReLU(),
                                      nn.Linear(4*hidden_dim, 2*hidden_dim),
                                      nn.ReLU(),
@@ -41,9 +39,7 @@ class VanillaVAE(BaseVAE):
                                      nn.ReLU(),
                                      nn.Linear(2*hidden_dim, 4*hidden_dim),
                                      nn.ReLU(),
-                                     nn.Linear(4*hidden_dim, 8*hidden_dim),
-                                     nn.ReLU(),
-                                     nn.Linear(8*hidden_dim, in_dim),
+                                     nn.Linear(4*hidden_dim, in_dim),
                                      nn.Tanh(),
                                     )
 
@@ -119,7 +115,7 @@ class VanillaVAE(BaseVAE):
         kldivergence_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
 
         loss = reconstruction_loss + kld_weight * self.beta * kldivergence_loss
-        return {'loss': loss, 'Reconstruction_Loss':reconstruction_loss.detach(), 'KLD':-kldivergence_loss.detach()}
+        return {'loss': loss, 'Reconstruction_Loss':reconstruction_loss.detach(), 'KLD':kldivergence_loss.detach()}
 
     def sample(self,
                num_samples:int,

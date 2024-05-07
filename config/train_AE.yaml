@@ -4,7 +4,7 @@ model:
         in_dim: 120 # 2*12*5 ####360 # 4*18*5
         hidden_dim: 12
         latent_dim: 3
-        beta: 4
+        beta: 0.000083
 dataset:
     name: data.datasetKI:KI_Dataset_VAE
     transform:
@@ -19,10 +19,10 @@ dataset:
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
-        # data_folder: /Volumes/USB3/thesis/data/poses_smooth_np/
-        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
-        # annotations_path: /Volumes/USB3/thesis/data/annotations.csv
+        # data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
+        data_folder: /Volumes/USB3/thesis/data/poses_smooth_np/
+        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        annotations_path: /Volumes/USB3/thesis/data/annotations.csv
         max_path: data/maxs.npy
         min_path: data/mins.npy
         feature_type: "kinematics"
@@ -56,7 +56,10 @@ hparams:
             gamma: 0.5
             min_lr_decay: Exp
             alpha: 0.5
-save_path: /local_storage/users/tibbe/models/VAE/
-# save_path: /Volumes/USB3/thesis/models/VAE/
+# save_path: /local_storage/users/tibbe/models/VAE/
+save_path: /Volumes/USB3/thesis/models/VAE/
 wandb:
     enable: true
+plot_reconstruction:
+    enable: true
+    period: 10

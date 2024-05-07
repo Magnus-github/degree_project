@@ -37,26 +37,42 @@ class Trainer:
         self.model.train()
         for epoch in range(self._cfg.hparams.epochs):
             running_loss = 0.0
+            running_reconst_loss = 0.0
+            running_kld = 0.0
             last_val_losses = []
             for i, data in enumerate(tqdm(self.train_loader)):
                 inputs = data[0]
                 inputs = inputs.to(self.device)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs['pred'], inputs, outputs['distribution'])['loss']
-                running_loss += loss.item()
-                loss.backward()
+                losses = self.criterion(outputs['pred'], inputs, outputs['distribution'])
+                total_loss = losses['loss']
+                reconstruction_loss = losses['Reconstruction_Loss']
+                kld = losses['KLD']
+                running_loss += total_loss.item()
+                running_reconst_loss += reconstruction_loss.item()
+                running_kld += kld.item()
+                total_loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
                 if not debugger_is_active() and self._cfg.wandb.enable:
                     last_lr = self.optimizer.param_groups[0]['lr']
-                    wandb.log({"Train Loss [batch]": loss.item(), "Learning Rate": last_lr})
+                    wandb.log({"Train Total Loss [batch]": total_loss.item(), "Train Reconstruction Loss [batch]": reconstruction_loss.item(),
+                               "Train KL-Divergence [batch]":kld.item() , "Learning Rate": last_lr})
                 
             self.logger.info(f"Epoch {epoch} Loss: {running_loss / len(self.train_loader)}")
-            val_loss = self.validate()
+
+            if self._cfg.plot_reconstruction.enable and epoch % self._cfg.plot_reconstruction.period == 0:
+                self.plot_reconstruction(inputs, outputs['pred'], data_type="train")
+
+            val_loss, val_reconstruction_loss, val_kld = self.validate(epoch)
             
             if not debugger_is_active() and self._cfg.wandb.enable:
-                wandb.log({"Train Loss [epoch]": running_loss / len(self.train_loader), "Val Loss": val_loss, "Epoch": epoch})
+                wandb.log({"Train Loss [epoch]": running_loss / len(self.train_loader),
+                           "Train Reconstruction Loss [epoch]": running_reconst_loss / len(self.train_loader),
+                           "Train KL-Divergence [epoch]": running_kld / len(self.train_loader),
+                           "Val Loss": val_loss, "Val Reconstruction Loss": val_reconstruction_loss,
+                           "Val KL-Divergence": val_kld, "Epoch": epoch})
 
             last_val_losses.append(val_loss)
             if len(last_val_losses) > 5:
@@ -66,31 +82,38 @@ class Trainer:
 
         torch.save(self.model.state_dict(), self.output_dir+"/model.pth")
 
-    def validate(self):
+    def validate(self, epoch: int):
         self.model.eval()
         with torch.no_grad():
             running_val_loss = 0.0
+            running_val_reconst_loss = 0.0
+            running_val_kld = 0.0
             for i, data in enumerate(tqdm(self.val_loader)):
                 inputs = data[0]
                 inputs = inputs.to(self.device)
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs['pred'], inputs, outputs['distribution'])['loss']
-                running_val_loss += loss.item()
+                losses = self.criterion(outputs['pred'], inputs, outputs['distribution'])
+                running_val_loss += losses['loss'].item()
+                running_val_reconst_loss += losses['Reconstruction_Loss'].item()
+                running_val_kld += losses['KLD'].item()
 
-                if i == 0 and False:
-                    self.plot_reconstruction(inputs, outputs['pred'])
+                if i == 0 and self._cfg.plot_reconstruction.enable and epoch % self._cfg.plot_reconstruction.period == 0:
+                    self.plot_reconstruction(inputs, outputs['pred'], data_type="val")
 
-        self.logger.info(f"Validation Loss: {running_val_loss / len(self.val_loader)}")
+        total_val_loss = running_val_loss / len(self.val_loader)
+        val_reconstruction_loss = running_val_reconst_loss / len(self.val_loader)
+        val_kld = running_val_kld / len(self.val_loader)
+        self.logger.info(f"Validation Loss: {total_val_loss}")
 
-        return running_val_loss / len(self.val_loader)
+        return total_val_loss, val_reconstruction_loss, val_kld
     
-    def plot_reconstruction(self, inputs, pred):
+    def plot_reconstruction(self, inputs, pred, data_type="val"):
         input = inputs.cpu()
         input = input.reshape(-1, *self.seq_orig_dim)
         input = input.permute(0, 3, 1, 2).numpy()
         pred = pred.cpu()
         pred = pred.reshape(-1, *self.seq_orig_dim)
-        pred = pred.permute(0, 3, 1, 2).numpy()
+        pred = pred.permute(0, 3, 1, 2).detach().numpy()
         chans, num_joints, clip_len = self.seq_orig_dim
         for i in range(0,501,100):
             fig, ax = plt.subplots(num_joints, chans, figsize=(15, 5*num_joints))
@@ -100,7 +123,7 @@ class Trainer:
                     ax[k, j].plot(pred[i,:,j,k], label="Pred")
                     ax[k, j].set_title(f"Joint {k} - {['x', 'y', 'v_x', 'v_y'][j]}")
                     ax[k, j].legend()
-            plt.savefig(f"reconstruction_{i}.png")
+            plt.savefig(f"reconstruction_{data_type}_{i}.png")
             plt.close()
             
 
