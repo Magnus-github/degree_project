@@ -49,9 +49,6 @@ class Trainer:
                 if not debugger_is_active() and self._cfg.wandb.enable:
                     last_lr = self.optimizer.param_groups[0]['lr']
                     wandb.log({"Train Loss [batch]": loss.item(), "Learning Rate": last_lr})
-
-                if i > 1:
-                    break
                 
             self.logger.info(f"Epoch {epoch} Loss: {running_loss / len(self.train_loader)}")
             val_loss = self.validate()
@@ -92,8 +89,8 @@ class Trainer:
         pred = pred.cpu()
         pred = pred.reshape(-1, 4, 18, 5)
         pred = pred.permute(0, 3, 1, 2).numpy()
-        fig, ax = plt.subplots(18, 4, figsize=(15, 5*18))
         for i in range(0,501,100):
+            fig, ax = plt.subplots(18, 4, figsize=(15, 5*18))
             for j in range(4):
                 for k in range(18):
                     ax[k, j].plot(input[i,:,j,k], label="GT")

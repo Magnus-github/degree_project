@@ -145,4 +145,3 @@ class VanillaVAE(BaseVAE):
         return self.forward(x)[0]
 
 
-
