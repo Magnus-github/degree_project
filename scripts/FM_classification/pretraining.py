@@ -77,7 +77,7 @@ class Trainer:
                 loss = self.criterion(outputs['pred'], inputs, outputs['distribution'])['loss']
                 running_val_loss += loss.item()
 
-                if i == 0:
+                if i == 0 and False:
                     self.plot_reconstruction(inputs, outputs['pred'])
 
         self.logger.info(f"Validation Loss: {running_val_loss / len(self.val_loader)}")
