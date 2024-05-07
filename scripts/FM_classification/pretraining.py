@@ -27,6 +27,8 @@ class Trainer:
         # self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params)
         self.criterion = self.model.loss_function
 
+        self.seq_orig_dim = cfg.hparams.orig_dim
+
         if not debugger_is_active() and cfg.wandb.enable:
             wandb.watch(self.model)
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -84,15 +86,16 @@ class Trainer:
     
     def plot_reconstruction(self, inputs, pred):
         input = inputs.cpu()
-        input = input.reshape(-1, 4, 18, 5)
+        input = input.reshape(-1, *self.seq_orig_dim)
         input = input.permute(0, 3, 1, 2).numpy()
         pred = pred.cpu()
-        pred = pred.reshape(-1, 4, 18, 5)
+        pred = pred.reshape(-1, *self.seq_orig_dim)
         pred = pred.permute(0, 3, 1, 2).numpy()
+        chans, num_joints, clip_len = self.seq_orig_dim
         for i in range(0,501,100):
-            fig, ax = plt.subplots(18, 4, figsize=(15, 5*18))
-            for j in range(4):
-                for k in range(18):
+            fig, ax = plt.subplots(num_joints, chans, figsize=(15, 5*num_joints))
+            for j in range(chans):
+                for k in range(num_joints):
                     ax[k, j].plot(input[i,:,j,k], label="GT")
                     ax[k, j].plot(pred[i,:,j,k], label="Pred")
                     ax[k, j].set_title(f"Joint {k} - {['x', 'y', 'v_x', 'v_y'][j]}")
@@ -100,9 +103,6 @@ class Trainer:
             plt.savefig(f"reconstruction_{i}.png")
             plt.close()
             
-
-
-
 
 
 

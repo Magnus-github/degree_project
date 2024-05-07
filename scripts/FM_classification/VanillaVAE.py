@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from typing import Optional
 
 from scripts.FM_classification.model_utils import BaseVAE
 
@@ -9,11 +10,13 @@ class VanillaVAE(BaseVAE):
     def __init__(self,
                  in_dim: int,
                  latent_dim: int,
-                 hidden_dim: int) -> None:
+                 hidden_dim: int,
+                 beta: Optional[int] = None) -> None:
         super(VanillaVAE, self).__init__()
 
         
         self.latent_dim = latent_dim
+        self.beta = beta if beta is not None else 1
 
         self.encoder = nn.Sequential(nn.Linear(in_dim, 8*hidden_dim),
                                      nn.ReLU(),
@@ -109,12 +112,13 @@ class VanillaVAE(BaseVAE):
         # kld_weight = kwargs['M_N'] # Account for the minibatch samples from the dataset
         kld_weight = 1
 
+
         reconstruction_loss = F.mse_loss(pred, input)
 
 
         kldivergence_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
 
-        loss = reconstruction_loss + kld_weight * kldivergence_loss
+        loss = reconstruction_loss + kld_weight * self.beta * kldivergence_loss
         return {'loss': loss, 'Reconstruction_Loss':reconstruction_loss.detach(), 'KLD':-kldivergence_loss.detach()}
 
     def sample(self,
