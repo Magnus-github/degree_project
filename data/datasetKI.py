@@ -228,31 +228,32 @@ class KI_Dataset_VAE(KIDataset):
 
         elif "kinematics" in self.feature_type:
             # Compute differences for both x and y dimensions
-            t = 1 / self.fps
-            diff = pose_sequence[1:, :, :-1] - pose_sequence[:-1, :, :-1]
+            diff_step = 2
+            t = diff_step / self.fps
+            diff = pose_sequence[diff_step:, :, :-1] - pose_sequence[:-diff_step, :, :-1]
             velocities = diff / t
+
             velocities = torch.concat([torch.zeros(1, velocities.shape[1], velocities.shape[2]), velocities], dim=0)
 
             # Compute diff of velocities in x and y
-            diff_v = velocities[1:] - velocities[:-1]
-            accelerations = diff_v / t
-            accelerations = torch.concat([torch.zeros(1, accelerations.shape[1], accelerations.shape[2]), accelerations], dim=0)
+            # diff_v = velocities[1:] - velocities[:-1]
+            # accelerations = diff_v / t
+            # accelerations = torch.concat([torch.zeros(1, accelerations.shape[1], accelerations.shape[2]), accelerations], dim=0)
 
             # calculate the total distance traveled by each joint in the sequence
-            distances = torch.zeros(velocities.shape)
-            for i in range(1, pose_sequence.shape[1]):
-                distances[i, :, :] = distances[i-1, :, :] + velocities[i-1, :, :]*t + 0.5*accelerations[i-1, :, :]*t**2
+            # distances = torch.zeros(velocities.shape)
+            # for i in range(1, pose_sequence.shape[1]):
+            #     distances[i, :, :] = distances[i-1, :, :] + velocities[i-1, :, :]*t + 0.5*accelerations[i-1, :, :]*t**2
 
             # distances = np.sqrt(distances[:, :, :, 0]**2 + distances[:, :, :, 1]**2)
-            distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
+            # distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
 
             # shape: [T, J, 7]
-            features = torch.concat([pose_sequence[:,:,:2], velocities, accelerations, distances], dim=-1)
+            # features = torch.concat([pose_sequence[:,:,:2], velocities, accelerations, distances], dim=-1)
+            features = torch.concat([pose_sequence[diff_step:,:,:2], velocities], dim=-1)
             features = features.permute(0,2,1)
             # shape: [T, 7, J]
             features = features.float()
-
-            features = features[:, :4]
 
             # fig, axs = plt.subplots(18, 4, figsize=(15, 5*18))
             # for i in range(4):
