@@ -293,7 +293,7 @@ class KI_Dataset_VAE(KIDataset):
         # features = self.get_features(torch.tensor(normalized_pose_sequence))
         features = torch.tensor(normalized_pose_sequence).permute(0, 2, 1).float()
 
-        features = features[:,:,2:14] # only arms and legs
+        features = features[:,:,2:8] # only arms and legs
 
         features_unfold = features.unfold(0, self.sample_len, self.stride)
 
@@ -404,3 +404,22 @@ if __name__ == "__main__":
     class_weights = compute_class_weight(class_weight='balanced', classes=classes, y=label_lst)
     print(f"Class weights: {class_weights}")
     
+
+def get_sparse_edge_matrix_skeleton_14():
+    matrix = np.array([
+        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+    ])
+    return matrix

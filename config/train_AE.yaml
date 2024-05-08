@@ -1,10 +1,11 @@
 model:
     name: scripts.FM_classification.VanillaVAE:VanillaVAE
     params:
-        in_dim: 120 # 2*12*5 ####360 # 4*18*5
-        hidden_dim: 12
-        latent_dim: 3
-        beta: 0.000083
+        in_dim: 60 # 2*6*5 ####360 # 4*18*5
+        hidden_dim: 8
+        latent_dim: 2
+        depth: 3
+        beta: 0.0167 # 1/120
 dataset:
     name: data.datasetKI:KI_Dataset_VAE
     transform:
@@ -19,10 +20,10 @@ dataset:
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        # data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
-        data_folder: /Volumes/USB3/thesis/data/poses_smooth_np/
-        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
-        annotations_path: /Volumes/USB3/thesis/data/annotations.csv
+        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
+        # data_folder: /Volumes/USB3/thesis/data/poses_smooth_np/
+        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        # annotations_path: /Volumes/USB3/thesis/data/annotations.csv
         max_path: data/maxs.npy
         min_path: data/mins.npy
         feature_type: "kinematics"
@@ -31,9 +32,9 @@ dataset:
         fps: 25
         diff_step: 2
 hparams:
-    epochs: 200
+    epochs: 1000
     batch_size: 1
-    orig_dim: [2, 12, 5]
+    orig_dim: [2, 6, 5]
     validation_period: 1
     optimizer:
         name: torch.optim:Adam
@@ -45,10 +46,10 @@ hparams:
         name: scripts.FM_classification.optimizer:CosineDecayWithWarmUpScheduler
         params:
             step_per_epoch: 120
-            init_warmup_lr: 0.001
+            init_warmup_lr: 0.0005
             warm_up_steps: 600 # 20 epochs
             max_lr: 0.0075
-            min_lr: 0.001
+            min_lr: 0.0075
             num_step_down: 24000 # 300 epochs
             num_step_up: 0 # None (empty is none)
             T_mul: 1
@@ -56,10 +57,10 @@ hparams:
             gamma: 0.5
             min_lr_decay: Exp
             alpha: 0.5
-# save_path: /local_storage/users/tibbe/models/VAE/
-save_path: /Volumes/USB3/thesis/models/VAE/
+save_path: /local_storage/users/tibbe/models/VAE/
+# save_path: /Volumes/USB3/thesis/models/VAE/
 wandb:
-    enable: true
+    enable: false
 plot_reconstruction:
     enable: true
-    period: 10
+    period: 100

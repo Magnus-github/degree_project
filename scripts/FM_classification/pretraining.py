@@ -18,6 +18,7 @@ class Trainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._cfg = cfg
         self.output_dir = os.path.join(self._cfg.save_path, str(run_id))
+        self.run_id = run_id
         os.makedirs(self.output_dir, exist_ok=True)
         self.model = str_to_class(cfg.model.name)(**cfg.model.params).to(self.device)
         self.train_loader = dataloaders['train']
@@ -123,7 +124,8 @@ class Trainer:
                     ax[k, j].plot(pred[i,:,j,k], label="Pred")
                     ax[k, j].set_title(f"Joint {k} - {['x', 'y', 'v_x', 'v_y'][j]}")
                     ax[k, j].legend()
-            plt.savefig(f"reconstruction_{data_type}_{i}.png")
+            id = self.run_id if self.run_id is not None else "noID"
+            plt.savefig(f"reconstruction_{id}_{data_type}_{i}.png")
             plt.close()
             
 
