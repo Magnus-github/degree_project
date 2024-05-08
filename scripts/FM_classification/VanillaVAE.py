@@ -3,6 +3,8 @@ from torch import nn
 from torch.nn import functional as F
 from typing import Optional
 
+import sys
+sys.path.append('.')
 from scripts.FM_classification.model_utils import BaseVAE
 
 
@@ -205,8 +207,8 @@ class GCN_VAE(BaseVAE):
         
         # Split the result into mu and var components
         # of the latent Gaussian distribution
-        mu = self.fc_mu(result.view(result.size(0), -1))
-        log_var = self.fc_var(result.view(result.size(0), -1))
+        mu = self.fc_mu(result)
+        log_var = self.fc_var(result)
 
         return [mu, log_var]
     
@@ -222,6 +224,69 @@ class GCN_VAE(BaseVAE):
         result = self.decoder(result, edge_matrix)
 
         return result
+    
+    def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+        """
+        Reparameterization trick to sample from N(mu, var) from
+        N(0,1).
+        :param mu: (Tensor) Mean of the latent Gaussian [B x D]
+        :param logvar: (Tensor) Standard deviation of the latent Gaussian [B x D]
+        :return: (Tensor) [B x D]
+        """
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return eps * std + mu
+    
+    def forward(self, input: torch.Tensor, edge_matrix: torch.Tensor, **kwargs) -> dict:
+        mu, log_var = self.encode(input, edge_matrix)
+        z = self.reparameterize(mu, log_var)
+        pred = self.decode(z, edge_matrix)
+        return  {'pred': pred, 'Z': z, 'distribution': [mu, log_var]}
+    
+    def loss_function(self, pred: torch.Tensor, input: torch.Tensor, distribtion: list[torch.tensor]) -> dict:
+        """
+        Computes the VAE loss function.
+        KL(N(\mu, \sigma), N(0, 1)) = \log \frac{1}{\sigma} + \frac{\sigma^2 + \mu^2}{2} - \frac{1}{2}
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        mu = distribtion[0]
+        log_var = distribtion[1]
+
+        # kld_weight = kwargs['M_N'] # Account for the minibatch samples from the dataset
+        kld_weight = 1
+
+        reconstruction_loss = F.mse_loss(pred, input)
+
+        kldivergence_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
+
+        loss = reconstruction_loss + kld_weight * self.beta * kldivergence_loss
+        return {'loss': loss, 'Reconstruction_Loss':reconstruction_loss.detach(), 'KLD':kldivergence_loss.detach()}
+    
+    def sample(self, num_samples:int, current_device: int) -> torch.Tensor:
+        """
+        Samples from the latent space and return the corresponding
+        image space map.
+        :param num_samples: (Int) Number of samples
+        :param current_device: (Int) Device to run the model
+        :return: (Tensor)
+        """
+        z = torch.randn(num_samples, self.latent_dim)
+
+        z = z.to(current_device)
+
+        samples = self.decode(z)
+        return samples
+    
+    def generate(self, x: torch.Tensor, edge_matrix: torch.Tensor) -> torch.Tensor:
+        """
+        Given an input image x, returns the reconstructed image
+        :param x: (Tensor) [B x C x H x W]
+        :return: (Tensor) [B x C x H x W]
+        """
+
+        return self.forward(x, edge_matrix)[0]
 
 
 # ----------------- Vanilla Autoencoder ----------------- #
@@ -283,3 +348,35 @@ class VanillaAE:
     
     def loss_function(self,input, pred):
         return F.mse_loss(pred, input)
+
+
+def get_sparse_edge_matrix_skeleton_14():
+    matrix = torch.tensor([
+        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+    ])
+    return matrix.float().to_sparse()
+
+if __name__ == '__main__':
+    model = GCN_VAE(in_dim=20, num_joints=14, hidden_dim=8, latent_dim=3, depth=4)
+
+    x = torch.randn(3000, 14, 20).float()
+
+    mat = get_sparse_edge_matrix_skeleton_14()
+    indices = mat.indices()
+
+    out = model(x, indices)
+
+    print(out.shape)

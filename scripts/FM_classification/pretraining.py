@@ -9,7 +9,7 @@ import logging
 import sys
 import os
 sys.path.append(".")
-from data.dataloaders import get_dataloaders
+from data.dataloaders import get_dataloaders, get_sparse_edge_matrix_skeleton_14
 from scripts.utils.str_to_class import str_to_class
 from scripts.utils.check_debugger import debugger_is_active
 
@@ -28,6 +28,8 @@ class Trainer:
         # self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params)
         self.criterion = self.model.loss_function
 
+        self.edge_indices = get_sparse_edge_matrix_skeleton_14().indices().to(self.device)
+
         self.seq_orig_dim = cfg.hparams.orig_dim
 
         if not debugger_is_active() and cfg.wandb.enable:
@@ -43,9 +45,11 @@ class Trainer:
             last_val_losses = []
             for i, data in enumerate(tqdm(self.train_loader)):
                 inputs = data[0]
+                N, C, J, t = inputs.shape
+                inputs = inputs.reshape(N, J, C*t)
                 inputs = inputs.to(self.device)
                 self.optimizer.zero_grad()
-                outputs = self.model(inputs)
+                outputs = self.model(inputs, self.edge_indices)
                 losses = self.criterion(outputs['pred'], inputs, outputs['distribution'])
                 total_loss = losses['loss']
                 reconstruction_loss = losses['Reconstruction_Loss']
@@ -91,8 +95,10 @@ class Trainer:
             running_val_kld = 0.0
             for i, data in enumerate(tqdm(self.val_loader)):
                 inputs = data[0]
+                N, C, J, t = inputs.shape
+                inputs = inputs.reshape(N, J, C*t)
                 inputs = inputs.to(self.device)
-                outputs = self.model(inputs)
+                outputs = self.model(inputs, self.edge_indices)
                 losses = self.criterion(outputs['pred'], inputs, outputs['distribution'])
                 running_val_loss += losses['loss'].item()
                 running_val_reconst_loss += losses['Reconstruction_Loss'].item()

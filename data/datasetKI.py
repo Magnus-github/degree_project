@@ -236,21 +236,6 @@ class KI_Dataset_VAE(KIDataset):
             diff = pose_sequence[self.diff_step:] - pose_sequence[:-self.diff_step]
             velocities = diff / t
 
-            # velocities = torch.concat([torch.zeros(1, velocities.shape[1], velocities.shape[2]), velocities], dim=0)
-
-            # Compute diff of velocities in x and y
-            # diff_v = velocities[1:] - velocities[:-1]
-            # accelerations = diff_v / t
-            # accelerations = torch.concat([torch.zeros(1, accelerations.shape[1], accelerations.shape[2]), accelerations], dim=0)
-
-            # calculate the total distance traveled by each joint in the sequence
-            # distances = torch.zeros(velocities.shape)
-            # for i in range(1, pose_sequence.shape[1]):
-            #     distances[i, :, :] = distances[i-1, :, :] + velocities[i-1, :, :]*t + 0.5*accelerations[i-1, :, :]*t**2
-
-            # distances = np.sqrt(distances[:, :, :, 0]**2 + distances[:, :, :, 1]**2)
-            # distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
-
             # shape: [T, J, 7]
             # features = torch.concat([pose_sequence[:,:,:2], velocities, accelerations, distances], dim=-1)
             features = torch.concat([pose_sequence[self.diff_step:], velocities], dim=-1)
@@ -293,14 +278,15 @@ class KI_Dataset_VAE(KIDataset):
         # features = self.get_features(torch.tensor(normalized_pose_sequence))
         features = torch.tensor(normalized_pose_sequence).permute(0, 2, 1).float()
 
-        features = features[:,:,2:8] # only arms and legs
+        features = features[:,:,:14] # all joints except the face
 
         features_unfold = features.unfold(0, self.sample_len, self.stride)
 
         # features = features.reshape(features.shape[0], features.shape[1], -1)
-        features_unfold = features_unfold.reshape(features_unfold.shape[0], -1)
+        # features_unfold = features_unfold.reshape(features_unfold.shape[0], -1)
 
         return features_unfold
+
 
 class KIDataset_clips(KIDataset):
     def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/clips_smooth_np/",
@@ -334,10 +320,10 @@ def collate_fn(batch):
     return pose_sequences, labels
 
 if __name__ == "__main__":
-    data_folder = "/Midgard/Data/tibbe/datasets/own/poses_smooth_np/"
-    # data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
-    annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
-    # annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
+    # data_folder = "/Midgard/Data/tibbe/datasets/own/poses_smooth_np/"
+    data_folder = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/poses_smooth_np/"
+    # annotations_path = "/Midgard/Data/tibbe/datasets/own/annotations.csv"
+    annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
     d_train = KI_Dataset_VAE(data_folder=data_folder, annotations_path=annotations_path, mode="train")
     d_val = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="val")
 
@@ -360,9 +346,10 @@ if __name__ == "__main__":
     t = start
     label_lst  = []
     seq_lens = []
-    for i, (pose_sequence, label) in enumerate(tqdm(dataloader)):
-        B, T, J, C = pose_sequence.shape
-        label_lst.append(mapping[label[0]])
+    mat = get_sparse_edge_matrix_skeleton_14()
+    for i, data in enumerate(tqdm(dataloader)):
+        B, T, J, C = data.shape
+        # label_lst.append(mapping[label[0]])
         seq_lens.append(T)
 
         # print(pose_sequence.shape, label)
@@ -405,21 +392,3 @@ if __name__ == "__main__":
     print(f"Class weights: {class_weights}")
     
 
-def get_sparse_edge_matrix_skeleton_14():
-    matrix = np.array([
-        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-    ])
-    return matrix
