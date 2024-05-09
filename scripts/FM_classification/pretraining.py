@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import matplotlib.pyplot as plt
 
 from omegaconf import OmegaConf
@@ -44,7 +45,7 @@ class Trainer:
             running_kld = 0.0
             last_val_losses = []
             for i, data in enumerate(tqdm(self.train_loader)):
-                inputs = data[0]
+                inputs = data[0][:10]
                 N, C, J, t = inputs.shape
                 inputs = inputs.reshape(N, J, C*t)
                 inputs = inputs.to(self.device)
@@ -70,6 +71,7 @@ class Trainer:
             if self._cfg.plot_reconstruction.enable and epoch % self._cfg.plot_reconstruction.period == 0:
                 if running_loss / len(self.train_loader) < 1.5:
                     self.plot_reconstruction(inputs, outputs['pred'], data_type="train")
+                    self.plot_skeleton(inputs, outputs['pred'], data_type="train")
 
             val_loss, val_reconstruction_loss, val_kld = self.validate(epoch)
             
@@ -124,7 +126,8 @@ class Trainer:
         pred = pred.reshape(-1, *self.seq_orig_dim)
         pred = pred.permute(0, 3, 1, 2).detach().numpy()
         chans, num_joints, clip_len = self.seq_orig_dim
-        for i in range(0,501,100):
+        seq_len = input.shape[0]
+        for i in np.linspace(0, seq_len-1, 5).astype(int):
             fig, ax = plt.subplots(num_joints, chans, figsize=(15, 5*num_joints))
             for j in range(chans):
                 for k in range(num_joints):
@@ -135,6 +138,30 @@ class Trainer:
             id = self.run_id if self.run_id is not None else "noID"
             plt.savefig(f"reconstruction_{id}_{data_type}_{i}.png")
             plt.close()
+
+    def plot_skeleton(self, inputs, pred, data_type="val"):
+        input = inputs.cpu()
+        input = input.reshape(-1, *self.seq_orig_dim)
+        input = input.permute(0, 3, 1, 2).numpy()
+        pred = pred.cpu()
+        pred = pred.reshape(-1, *self.seq_orig_dim)
+        pred = pred.permute(0, 3, 1, 2).detach().numpy()
+        chans, num_joints, clip_len = self.seq_orig_dim
+        seq_len = input.shape[0]
+        fig, ax = plt.subplots(5, 1, figsize=(5, 5*5))
+
+        for j, i in enumerate(np.linspace(0, seq_len-1, 5).astype(int)):
+            # for j in range(num_joints):
+            ax[j].scatter(input[i,0,0,:], input[i,0,1,:], label="GT")
+            ax[j].scatter(pred[i,0,0,:], pred[i,0,1,:], label="Pred")
+            ax[j].set_xlim(-1, 1)
+            ax[j].set_ylim(-1, 1)
+            ax[j].set_title(f"Skeleton at frame {i} - xy")
+            ax[j].legend()
+        
+        id = self.run_id if self.run_id is not None else "noID"
+        plt.savefig(f"skeleton_{id}_{data_type}.png")
+        plt.close()
             
 
 

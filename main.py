@@ -104,7 +104,7 @@ def pretrain(cfg: DictConfig):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/train_AE.yaml")
+    parser.add_argument("--config", type=str, default="config/train_TF.yaml")
     args = parser.parse_args()
     cfg = OmegaConf.load(args.config)
     logger.info(cfg)

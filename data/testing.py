@@ -154,5 +154,76 @@ def get_dataset_max_min():
     #     plot_frequency_distribution(pose_sequence_f, f_orig, resampled_f, f_resampled, ID=i)
 
 
+
+def plot_skeletons():
+    data_folder = "/Volumes/USB3/thesis/data/poses_smooth_np/"
+    out_dir = "/Volumes/USB3/thesis/data/np_poses_corrected/"
+    os.makedirs(out_dir, exist_ok=True)
+    for pose_file in os.listdir(data_folder):
+        with open(os.path.join(data_folder, pose_file), 'rb') as file:
+                data = np.load(file)
+        
+        pose_sequence = data
+
+        pose_sequence = pose_sequence[:,:14,:2]
+        n_frames, n_joints, dim = pose_sequence.shape
+
+        # find angle of the body
+        hip_point = (pose_sequence[:, 8] + pose_sequence[:, 11]) / 2
+        angle = np.arctan2(pose_sequence[:, 1, 1] - hip_point[:, 1], pose_sequence[:, 1, 0] - hip_point[:, 0])
+        angle_to_rotate = np.pi/2 - np.mean(angle)
+        # rotate the skeleton around the neck joint
+        # pose_sequence = np.dot(np.array([[np.cos(angle_to_rotate), -np.sin(angle_to_rotate)], [np.sin(angle_to_rotate), np.cos(angle_to_rotate)]]), pose_sequence.T).T
+        for i in range(n_frames):
+            pose_sequence[i] = np.dot(np.array([[np.cos(angle_to_rotate), -np.sin(angle_to_rotate)], [np.sin(angle_to_rotate), np.cos(angle_to_rotate)]]), pose_sequence[i].T).T
+
+        hip_point = (pose_sequence[:, 8] + pose_sequence[:, 11]) / 2
+        angle = np.arctan2(pose_sequence[:, 1, 1] - hip_point[:, 1], pose_sequence[:, 1, 0] - hip_point[:, 0])
+
+
+        pose_sequence = np.clip(pose_sequence, -2, 2)
+        if np.max(pose_sequence) > 2 or np.min(pose_sequence) < -2:
+            print(f"ID: {pose_file.split('_')[1]}")
+            print(f"MAX: {np.argmax(pose_sequence, axis=0)}")
+            print(f"MIN: {np.argmin(pose_sequence, axis=0)}")
+
+        start = end = int(n_frames*0.05)
+        
+        pose_sequence = pose_sequence[start:-end]
+        n_frames = pose_sequence.shape[0]
+
+        # shift skeleton, so that the hips are at the origin
+        hip_point = (pose_sequence[:, 8] + pose_sequence[:, 11]) / 2
+        hip_point = np.expand_dims(hip_point, axis=1)
+        pose_sequence = pose_sequence - hip_point
+
+        # scale between -1 and 1
+        pose_sequence = pose_sequence / np.max(np.abs(pose_sequence))
+
+        fig, axs = plt.subplots(5, 1, figsize=(5, 5*5))
+
+        for j, i in enumerate(np.linspace(0, n_frames-1, 5).astype(int)):
+            axs[j].scatter(pose_sequence[i, :, 0], pose_sequence[i, :, 1])
+            # draw the edges of the skeleton
+            for edge in [[0, 1], [1, 2], [2, 3], [3, 4], [1, 5], [5, 6], [6, 7], [2, 8], [8, 9], [9, 10], [8,11], [5, 11], [11, 12], [12, 13]]:
+                axs[j].plot(pose_sequence[i, edge, 0], pose_sequence[i, edge, 1], color='black')
+            
+            # define point between hips
+            hip_point = (pose_sequence[i, 8] + pose_sequence[i, 11]) / 2
+
+
+            axs[j].plot([pose_sequence[i, 1, 0], hip_point[0]], [pose_sequence[i, 1, 1], hip_point[1]], color='black')
+
+
+                # axs[j].set_xlim(-1, 1)
+                # axs[j].set_ylim(-1, 1)
+            axs[j].set_title(f"Skeleton at frame {i}")
+        
+        plt.savefig(f"output/sanity_check/skeleton_{pose_file.split('_')[1]}.png")
+        plt.close()
+
+        np.save(f"{out_dir}{pose_file}", pose_sequence)
+
+
 if __name__ == "__main__":
-    get_dataset_max_min()
+    plot_skeletons()

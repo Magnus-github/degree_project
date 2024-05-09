@@ -21,7 +21,7 @@ class KIDataset(Dataset):
         test_data = sorted(list(set(val_test_data) - set(val_data)))
         self.test = False
         if mode == "train":
-            self.data = train_data[:1]
+            self.data = train_data
         if mode == "val":
             self.data = val_data
         if mode == "test":
@@ -273,10 +273,10 @@ class KI_Dataset_VAE(KIDataset):
             if label == "1" or label == "4":
                 pose_sequence = self.transform(pose_sequence)
 
-        normalized_pose_sequence = ((pose_sequence[:,:,:2] - self.mins) / (self.maxs - self.mins)).clip(-1, 1)
+        # normalized_pose_sequence = ((pose_sequence[:,:,:2] - self.mins) / (self.maxs - self.mins)).clip(-1, 1)
 
         # features = self.get_features(torch.tensor(normalized_pose_sequence))
-        features = torch.tensor(normalized_pose_sequence).permute(0, 2, 1).float()
+        features = torch.tensor(pose_sequence).permute(0, 2, 1).float()
 
         features = features[:,:,:14] # all joints except the face
 

@@ -278,7 +278,7 @@ class GCN_VAE(BaseVAE):
         # kldivergence_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
         kldivergence_loss = torch.sum(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
 
-        loss = 20*reconstruction_loss + kld_weight * self.beta * kldivergence_loss
+        loss = 10*reconstruction_loss + kld_weight * self.beta * kldivergence_loss
         return {'loss': loss, 'Reconstruction_Loss':reconstruction_loss.detach(), 'KLD':kldivergence_loss.detach()}
     
     def sample(self, num_samples:int, current_device: int) -> torch.Tensor:

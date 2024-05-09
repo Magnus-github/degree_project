@@ -11,7 +11,7 @@ import omegaconf
 
 
 def test_learning_rate_schedule():
-    cfg = omegaconf.OmegaConf.load("/Midgard/home/tibbe/thesis/degree_project/config/train_AE.yaml")
+    cfg = omegaconf.OmegaConf.load("config/train_AE.yaml")
 
     optim = torch.optim.Adam([torch.tensor(1.0)], lr=1e-3)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim, T_0=10, T_mult=2)
@@ -59,4 +59,4 @@ def plot_validation_samples():
 
 
 if __name__ == "__main__":
-    plot_validation_samples()
+    test_learning_rate_schedule()

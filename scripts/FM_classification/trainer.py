@@ -75,9 +75,11 @@ class Trainer:
         elif "kinematics" in name:
             # Compute differences for both x and y dimensions
             t = 1 / self._cfg.dataset.fps
-            diff = pose_sequence[:, 1:, :, :-1] - pose_sequence[:, :-1, :, :-1]
-            velocities = diff / t
+            t=1
+            diff = pose_sequence[:, 1:] - pose_sequence[:, :-1]
+            velocities = diff * t
             velocities = torch.concat([torch.zeros(velocities.shape[0], 1, velocities.shape[2], velocities.shape[3]), velocities], dim=1)
+            # scaled_velocities = velocities / torch.linalg.norm(velocities, axis=-1).unsqueeze(-1)
 
             # Compute diff of velocities in x and y
             diff_v = velocities[:, 1:] - velocities[:, :-1]
