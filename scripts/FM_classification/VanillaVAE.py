@@ -183,8 +183,8 @@ class GCN_VAE(BaseVAE):
         self.fc_var = nn.Linear(hidden_dim*num_joints, latent_dim)
 
         self.decoder_input = nn.Linear(latent_dim, hidden_dim*num_joints)
-        self.decoder_input_1 = nn.Linear(hidden_dim*num_joints, hidden_dim)
 
+        hidden_dim = hidden_dim*num_joints
         in_dim = hidden_dim
         decoder_layers = []
         for i in range(depth):
@@ -193,7 +193,7 @@ class GCN_VAE(BaseVAE):
                 decoder_layers.append(nn.ReLU())
                 in_dim = 2**(i+1)*hidden_dim
             else:
-                decoder_layers.append(nn.Linear(2**(i)*hidden_dim, self.in_dim))
+                decoder_layers.append(nn.Linear(2**(i)*hidden_dim, self.in_dim*num_joints))
                 decoder_layers.append(nn.Tanh())
 
         self.decoder = nn.Sequential(*decoder_layers)
@@ -234,7 +234,6 @@ class GCN_VAE(BaseVAE):
         :return: (Tensor) [B, N*J*C*t]
         """
         result = self.decoder_input(z)
-        result = self.decoder_input_1(result)
         result = self.decoder(result)
         result = result.view(result.size(0), self.num_joints, -1)
         # result = self.decoder(result, edge_matrix)
