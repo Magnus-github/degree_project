@@ -21,7 +21,7 @@ class KIDataset(Dataset):
         test_data = sorted(list(set(val_test_data) - set(val_data)))
         self.test = False
         if mode == "train":
-            self.data = train_data
+            self.data = train_data[:1]
         if mode == "val":
             self.data = val_data
         if mode == "test":

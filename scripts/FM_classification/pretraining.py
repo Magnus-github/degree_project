@@ -68,7 +68,8 @@ class Trainer:
             self.logger.info(f"Epoch {epoch} Loss: {running_loss / len(self.train_loader)}")
 
             if self._cfg.plot_reconstruction.enable and epoch % self._cfg.plot_reconstruction.period == 0:
-                self.plot_reconstruction(inputs, outputs['pred'], data_type="train")
+                if running_loss / len(self.train_loader) < 1.5:
+                    self.plot_reconstruction(inputs, outputs['pred'], data_type="train")
 
             val_loss, val_reconstruction_loss, val_kld = self.validate(epoch)
             
@@ -105,7 +106,8 @@ class Trainer:
                 running_val_kld += losses['KLD'].item()
 
                 if i == 0 and self._cfg.plot_reconstruction.enable and epoch % self._cfg.plot_reconstruction.period == 0:
-                    self.plot_reconstruction(inputs, outputs['pred'], data_type="val")
+                    if running_val_loss / len(self.val_loader) < 0.01:
+                        self.plot_reconstruction(inputs, outputs['pred'], data_type="val")
 
         total_val_loss = running_val_loss / len(self.val_loader)
         val_reconstruction_loss = running_val_reconst_loss / len(self.val_loader)

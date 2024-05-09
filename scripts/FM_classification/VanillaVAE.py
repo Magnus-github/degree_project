@@ -119,10 +119,10 @@ class VanillaVAE(BaseVAE):
         kld_weight = 1
 
 
-        reconstruction_loss = F.mse_loss(pred, input)
+        reconstruction_loss = F.mse_loss(pred, input, reduction = 'sum')
 
 
-        kldivergence_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
+        kldivergence_loss = torch.sum(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
 
         loss = reconstruction_loss + kld_weight * self.beta * kldivergence_loss
         return {'loss': loss, 'Reconstruction_Loss':reconstruction_loss.detach(), 'KLD':kldivergence_loss.detach()}
@@ -183,17 +183,31 @@ class GCN_VAE(BaseVAE):
         self.fc_var = nn.Linear(hidden_dim*num_joints, latent_dim)
 
         self.decoder_input = nn.Linear(latent_dim, hidden_dim*num_joints)
+        self.decoder_input_1 = nn.Linear(hidden_dim*num_joints, hidden_dim)
 
-        self.decoder = geo_nn.Sequential('x, edge_index', [
-            (geo_nn.GCNConv(hidden_dim, hidden_dim), 'x, edge_index -> x'),
-            nn.ReLU(),
-            (geo_nn.GCNConv(hidden_dim, hidden_dim), 'x, edge_index -> x'),
-            nn.ReLU(),
-            (geo_nn.GCNConv(hidden_dim, 2*hidden_dim), 'x, edge_index -> x'),
-            nn.ReLU(),
-            (geo_nn.GCNConv(2*hidden_dim, in_dim), 'x, edge_index -> x'),
-            nn.Tanh()
-        ])
+        in_dim = hidden_dim
+        decoder_layers = []
+        for i in range(depth):
+            if i < depth-1:
+                decoder_layers.append(nn.Linear(in_dim, 2**(i+1)*hidden_dim))
+                decoder_layers.append(nn.ReLU())
+                in_dim = 2**(i+1)*hidden_dim
+            else:
+                decoder_layers.append(nn.Linear(2**(i)*hidden_dim, self.in_dim))
+                decoder_layers.append(nn.Tanh())
+
+        self.decoder = nn.Sequential(*decoder_layers)
+
+        # self.decoder = geo_nn.Sequential('x, edge_index', [
+        #     (geo_nn.GCNConv(hidden_dim, hidden_dim), 'x, edge_index -> x'),
+        #     nn.ReLU(),
+        #     (geo_nn.GCNConv(hidden_dim, hidden_dim), 'x, edge_index -> x'),
+        #     nn.ReLU(),
+        #     (geo_nn.GCNConv(hidden_dim, 2*hidden_dim), 'x, edge_index -> x'),
+        #     nn.ReLU(),
+        #     (geo_nn.GCNConv(2*hidden_dim, in_dim), 'x, edge_index -> x'),
+        #     nn.Tanh()
+        # ])
 
     def encode(self, input: torch.Tensor, edge_matrix: torch.Tensor) -> list[torch.Tensor]:
         """
@@ -220,8 +234,10 @@ class GCN_VAE(BaseVAE):
         :return: (Tensor) [B, N*J*C*t]
         """
         result = self.decoder_input(z)
+        result = self.decoder_input_1(result)
+        result = self.decoder(result)
         result = result.view(result.size(0), self.num_joints, -1)
-        result = self.decoder(result, edge_matrix)
+        # result = self.decoder(result, edge_matrix)
 
         return result
     
@@ -257,11 +273,13 @@ class GCN_VAE(BaseVAE):
         # kld_weight = kwargs['M_N'] # Account for the minibatch samples from the dataset
         kld_weight = 1
 
-        reconstruction_loss = F.mse_loss(pred, input)
+        # reconstruction_loss = F.mse_loss(pred, input)
+        reconstruction_loss = mse_loss(pred, input)
 
-        kldivergence_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
+        # kldivergence_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
+        kldivergence_loss = torch.sum(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
 
-        loss = reconstruction_loss + kld_weight * self.beta * kldivergence_loss
+        loss = 20*reconstruction_loss + kld_weight * self.beta * kldivergence_loss
         return {'loss': loss, 'Reconstruction_Loss':reconstruction_loss.detach(), 'KLD':kldivergence_loss.detach()}
     
     def sample(self, num_samples:int, current_device: int) -> torch.Tensor:
@@ -368,6 +386,10 @@ def get_sparse_edge_matrix_skeleton_14():
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
     ])
     return matrix.float().to_sparse()
+
+def mse_loss(input, target):
+    return torch.mean((input - target) ** 2, dim=0).sum()
+
 
 if __name__ == '__main__':
     model = GCN_VAE(in_dim=20, num_joints=14, hidden_dim=8, latent_dim=3, depth=4)
