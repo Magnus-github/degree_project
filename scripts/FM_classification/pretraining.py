@@ -45,12 +45,15 @@ class Trainer:
             running_kld = 0.0
             last_val_losses = []
             for i, data in enumerate(tqdm(self.train_loader)):
-                inputs = data[0][:10]
-                N, C, J, t = inputs.shape
-                inputs = inputs.reshape(N, J, C*t)
+                inputs = data[0]#[:10]
+                # N, C, J, t = inputs.shape
+                # inputs = inputs.reshape(N, J, C*t)
                 inputs = inputs.to(self.device)
                 self.optimizer.zero_grad()
-                outputs = self.model(inputs, self.edge_indices)
+                if "GCN" in self._cfg.model.name:
+                    outputs = self.model(inputs, self.edge_indices)
+                else:
+                    outputs = self.model(inputs)
                 losses = self.criterion(outputs['pred'], inputs, outputs['distribution'])
                 total_loss = losses['loss']
                 reconstruction_loss = losses['Reconstruction_Loss']
@@ -98,10 +101,13 @@ class Trainer:
             running_val_kld = 0.0
             for i, data in enumerate(tqdm(self.val_loader)):
                 inputs = data[0]
-                N, C, J, t = inputs.shape
-                inputs = inputs.reshape(N, J, C*t)
+                # N, C, J, t = inputs.shape
+                # inputs = inputs.reshape(N, J, C*t)
                 inputs = inputs.to(self.device)
-                outputs = self.model(inputs, self.edge_indices)
+                if "GCN" in self._cfg.model.name:
+                    outputs = self.model(inputs, self.edge_indices)
+                else:
+                    outputs = self.model(inputs)
                 losses = self.criterion(outputs['pred'], inputs, outputs['distribution'])
                 running_val_loss += losses['loss'].item()
                 running_val_reconst_loss += losses['Reconstruction_Loss'].item()
@@ -154,6 +160,9 @@ class Trainer:
             # for j in range(num_joints):
             ax[j].scatter(input[i,0,0,:], input[i,0,1,:], label="GT")
             ax[j].scatter(pred[i,0,0,:], pred[i,0,1,:], label="Pred")
+            for edge in [[0, 1], [1, 2], [2, 3], [3, 4], [1, 5], [5, 6], [6, 7], [2, 8], [8, 9], [9, 10], [8,11], [5, 11], [11, 12], [12, 13]]:
+                ax[j].plot(input[i,0,0,edge], input[i,0,1,edge], color='black')
+                ax[j].plot(pred[i,0,0,edge], pred[i,0,1,edge], color='gray')
             ax[j].set_xlim(-1, 1)
             ax[j].set_ylim(-1, 1)
             ax[j].set_title(f"Skeleton at frame {i} - xy")

@@ -19,9 +19,9 @@ def train(cfg: DictConfig):
         cfg.logger.enable = False
 
     if "dynamicClipSample" in cfg.dataset.name:
-        dataloaders = get_dataloaders_clips(cfg)
+        dataloaders = get_dataloaders_clips(cfg, fold=0)
     else:
-        dataloaders = get_dataloaders(cfg)
+        dataloaders = get_dataloaders(cfg, fold=0)
 
     if debugger_is_active():
         cfg.hparams.epochs = 1

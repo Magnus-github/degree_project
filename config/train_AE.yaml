@@ -1,22 +1,22 @@
 model:
-    name: scripts.FM_classification.VanillaVAE:GCN_VAE
+    name: scripts.FM_classification.VanillaVAE:VanillaVAE
     params:
+        in_dim: 140 # 2*6*5 ####360 # 4*18*5
+        hidden_dim: 32
+        latent_dim: 3
+        depth: 2
+        beta: 0.0071 # 1/120
+    params_GCN_VAE:
         in_dim: 10 # 2*5
         num_joints: 14
         hidden_dim: 4
         latent_dim: 2
-        depth: 3
-        beta: 0.0714 # 1/14
-    params_VAE:
-        in_dim: 60 # 2*6*5 ####360 # 4*18*5
-        hidden_dim: 8
-        latent_dim: 2
-        depth: 3
-        beta: 0.0167 # 1/120
+        depth: 4
+        beta: 0.000714 # 1/14
 dataset:
     name: data.datasetKI:KI_Dataset_VAE
     transform:
-        enable: false
+        enable: true
         name: data.augmentations:RandScale
         params:
             magnitude: 0.5 # [0, 1]
@@ -24,11 +24,11 @@ dataset:
             class_agnostic: false
     mapping: {'1': 0, '4': 0, '12': 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
     sampling: 
-        enable: true
+        enable: false
         method: oversampling # options: [oversampling, undersampling]
     params:
         # data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
-        data_folder: /Volumes/USB3/thesis/data/poses_smooth_np/
+        data_folder: /Volumes/USB3/thesis/data/np_poses_corrected/
         # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
         annotations_path: /Volumes/USB3/thesis/data/annotations.csv
         max_path: data/maxs.npy
@@ -52,22 +52,22 @@ hparams:
     scheduler:
         name: scripts.FM_classification.optimizer:CosineDecayWithWarmUpScheduler
         params:
-            step_per_epoch: 120
+            step_per_epoch: 1
             init_warmup_lr: 0.0005
-            warm_up_steps: 600 # 20 epochs
+            warm_up_steps: 40 # 20 epochs
             max_lr: 0.0075
             min_lr: 0.0075
-            num_step_down: 24000 # 300 epochs
-            num_step_up: 0 # None (empty is none)
+            num_step_down: 20 # 300 epochs
+            num_step_up: 0  # None (empty is none)
             T_mul: 1
-            max_lr_decay: Exp
+            max_lr_decay:
             gamma: 0.5
-            min_lr_decay: Exp
+            min_lr_decay:
             alpha: 0.5
 # save_path: /local_storage/users/tibbe/models/VAE/
 save_path: /Volumes/USB3/thesis/models/VAE/
 wandb:
-    enable: false
+    enable: true
 plot_reconstruction:
     enable: true
     period: 100

@@ -1,6 +1,6 @@
 model:
     name: scripts.FM_classification.model:TimeFormer
-    in_features: kinematics_acc # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
+    in_features: kinematics_vel # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
     load_weights:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
@@ -9,7 +9,7 @@ model:
         joint_hidden_channels: 128
         num_encoder_layers: 1
         num_heads: 2
-        num_joints: 14 # options: [14, 18]
+        num_joints: 4 # options: [2, 4, 6, 14, 18]
         clip_len: 480
         num_classes: 2
         dropout: 0.6
@@ -25,20 +25,24 @@ dataset:
             p: 0.9 # [0, 1]
             class_agnostic: false
     fps: 25
-    mapping: {'1': 0, '4': 0, '12': 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
+    diff_step: 2
+    joints: hands_and_feet # options: [hands, feet, hands_and_feet, hips, hands_and_hips, feet_and_hips, hands_and_feet_and_hips]
+    mapping: {1: 0, 4: 0, 12: 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
     sampling: 
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
-        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        # data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
+        data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
+        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        annotations_path: /Volumes/USB3/thesis/data/annotations_new.csv
     params_clips:
         sample_rate: 1
         clip_length: 720
         max_overlap: 50
 hparams:
     epochs: 1000
-    batch_size: 24
+    batch_size: 12
     validation_period: 1
     early_stopping:
         enable: false
@@ -89,10 +93,12 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
+    project: FM_classification_2class
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    # path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    path: /Volumes/USB3/thesis/models/FM/TimeFormer/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth

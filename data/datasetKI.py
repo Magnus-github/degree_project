@@ -8,32 +8,44 @@ import time
 from tqdm import tqdm
 import random
 from sklearn.utils.class_weight import compute_class_weight
+from sklearn.model_selection import StratifiedKFold
 
 
 class KIDataset(Dataset):
-    def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", transform = None, seed: int = 42):
-        self.data_folder = data_folder
-        all_data = os.listdir(self.data_folder)
-        random.seed(seed)
-        train_data = random.sample(all_data, int(0.8*len(all_data)))
-        val_test_data = sorted(list(set(all_data) - set(train_data)))
-        val_data = random.sample(val_test_data, int(0.5*len(val_test_data)))
-        test_data = sorted(list(set(val_test_data) - set(val_data)))
-        self.test = False
-        if mode == "train":
-            self.data = train_data
-        if mode == "val":
-            self.data = val_data
-        if mode == "test":
-            self.data = test_data
-            self.test = True
-
+    def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", transform = None, seed: int = 42, fold: int = 0):
         self.labels = []
         self.ids = {}
         self._get_labels_and_ids(annotations_path)
 
+        self.data_folder = data_folder
+        all_data = os.listdir(self.data_folder)
+
+        skf = StratifiedKFold(n_splits=10, random_state=seed, shuffle=True)
+        splits = list(skf.split(all_data, self.labels))
+        train_idx, val_test_idx = splits[fold]
+
+        if mode == "train":
+            self.data = [all_data[i] for i in train_idx]
+        if mode == "val":
+            self.data = [all_data[i] for i in val_test_idx]
+        if mode == "test":
+            self.data = [all_data[i] for i in val_test_idx]
+
         self.transform = transform
 
+        # random.seed(seed)
+        # train_data = random.sample(all_data, int(0.8*len(all_data)))
+        # val_test_data = sorted(list(set(all_data) - set(train_data)))
+        # val_data = random.sample(val_test_data, int(0.5*len(val_test_data)))
+        # test_data = sorted(list(set(val_test_data) - set(val_data)))
+        # self.test = False
+        # if mode == "train":
+        #     self.data = train_data[:1]
+        # if mode == "val":
+        #     self.data = val_data
+        # if mode == "test":
+        #     self.data = test_data
+        #     self.test = True
 
     def __len__(self):
         return len(self.data)
@@ -47,7 +59,6 @@ class KIDataset(Dataset):
                 self.ids[int(row[0])] = i-1
                 self.labels.append(row[1])
 
-    
     def __getitem__(self, idx):
         pose_file = self.data[idx]
         with open(os.path.join(self.data_folder, pose_file), 'rb') as file:
@@ -72,9 +83,9 @@ class KIDataset(Dataset):
 class KIDataset_dynamicClipSample(KIDataset):
     def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/poses_smooth_np/",
                  annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
-                 mode: str = "train", transform = None, seed: int = 42,
+                 mode: str = "train", transform = None, seed: int = 42, fold: int = 0,
                  sample_rate: int = 2, clip_length: int = 720, max_overlap: int = 50):
-        super().__init__(data_folder, annotations_path, mode, transform, seed)
+        super().__init__(data_folder, annotations_path, mode, transform, seed, fold)
         self.sample_rate = sample_rate
         self.clip_length = clip_length
         self.stride = clip_length - max_overlap
@@ -97,24 +108,10 @@ class KIDataset_dynamicClipSample(KIDataset):
 
         n_frames = pose_sequence.shape[0]
 
-        pose_clips = []
+        assert n_frames >= self.clip_length, f"Clip length {self.clip_length} is longer than sequence length {n_frames}."
+        pose_clips = torch.tensor(pose_sequence).unfold(0, self.clip_length, self.stride)
 
-        if (n_frames - self.clip_length) / self.stride < 1: # If we can't take at least one stride (i.e. two clips) from the sequence
-            self.sample_rate = 1
-
-        if n_frames < self.clip_length: # If the sequence is shorter than the clip length
-            pose_sequence = np.concatenate([pose_sequence, np.zeros((self.clip_length - n_frames, pose_sequence.shape[1], pose_sequence.shape[2]))], axis=0)
-            pose_clips.append(pose_sequence)
-        elif n_frames > self.clip_length:
-            sample_pool = list(range(0, n_frames - self.clip_length, self.stride))
-            for i in range(self.sample_rate):
-                start = random.choice(sample_pool)
-                pose_clips.append(pose_sequence[start:start+self.clip_length])
-                sample_pool.remove(start)
-
-        pose_clips = np.array(pose_clips)
-
-        # ratio = self.clip_length / n_frames
+        label = torch.tensor([int(label)]*pose_clips.shape[0])
 
         return pose_clips, label
     
@@ -280,10 +277,10 @@ class KI_Dataset_VAE(KIDataset):
 
         features = features[:,:,:14] # all joints except the face
 
-        features_unfold = features.unfold(0, self.sample_len, self.stride)
+        features_unfold = features.unfold(0, self.sample_len, self.stride) # shape: [T, C, J, sample_len]
 
         # features = features.reshape(features.shape[0], features.shape[1], -1)
-        # features_unfold = features_unfold.reshape(features_unfold.shape[0], -1)
+        features_unfold = features_unfold.reshape(features_unfold.shape[0], -1)
 
         return features_unfold
 
@@ -311,13 +308,7 @@ class KIDataset_clips(KIDataset):
         return pose_sequence, label, count
 
 
-def collate_fn(batch):
-    pose_sequences = [item[0] for item in batch]
 
-    pose_sequences = torch.concat(pose_sequences, dim=0)
-    labels = [item[1] for item in batch]
-    labels = torch.tensor(labels)
-    return pose_sequences, labels
 
 if __name__ == "__main__":
     # data_folder = "/Midgard/Data/tibbe/datasets/own/poses_smooth_np/"
