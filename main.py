@@ -33,7 +33,7 @@ def train(cfg: DictConfig):
             suffix = "STTransformer"
         else:
             raise ValueError("Unknown model name.")
-        run = wandb.init(project=f'FM-classification_2Class_{suffix}', config=dict(cfg), entity="m46nu5")
+        run = wandb.init(project=f'{cfg.logger.project}_{suffix}', config=dict(cfg), entity="m46nu5")
     else:
         cfg.hparams.epochs = 25
         cfg.hparams.validation_period = 1

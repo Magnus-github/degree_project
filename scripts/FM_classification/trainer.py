@@ -137,10 +137,8 @@ class Trainer:
         self.model.train()
         self.logger.info("Starting training...")
         # num_samples = len(self.train_dataloader)*self._cfg.hparams.batch_size - 
-        outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, self._cfg.model.in_params.num_classes)
+        # outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, self._cfg.model.in_params.num_classes)
         # labels = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size)
-        labels = []
-        val_losses = []
         x = np.arange(0, self._cfg.hparams.early_stopping.patience)
         val_loss = np.inf
         best_val_loss = np.inf
@@ -148,6 +146,9 @@ class Trainer:
         last_lr = self.optimizer.param_groups[0]['lr']
         for epoch in range(self._cfg.hparams.epochs):
             running_loss = 0.0
+            labels = []
+            outputs = []
+            val_losses = []
             for i, (data) in enumerate(tqdm(self.train_dataloader)):
                 if len(data) == 3:
                     pose_sequence, target, count = data
@@ -172,7 +173,7 @@ class Trainer:
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
                 output = self.model(features)
-                outputs[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(output)] = output.softmax(axis=1)
+                outputs.append(output.softmax(axis=1))
                 loss = self.criterion(output, label)
                 loss.backward()
                 self.optimizer.step()
@@ -189,6 +190,9 @@ class Trainer:
                         last_lr = self.optimizer.param_groups[0]['lr']
                         wandb.log({"Learning Rate": last_lr})
 
+
+            outputs = torch.cat(outputs, 0)
+            labels = torch.tensor(labels)
             train_accuracy = self.compute_accuracy(outputs, labels)
             
             self.logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
@@ -248,7 +252,7 @@ class Trainer:
                 else:
                     pose_sequence, target = data
 
-                label = torch.tensor([self.class_mapping[t] for t in target])
+                label = torch.tensor([self.class_mapping[int(t)] for t in target])
                 labels[i] = label
                 # pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
