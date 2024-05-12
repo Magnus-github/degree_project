@@ -10,7 +10,7 @@ model:
         num_encoder_layers: 1
         num_heads: 2
         num_joints: 4 # options: [2, 4, 6, 14, 18]
-        clip_len: 360
+        clip_len: 240
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:MaxPool
@@ -23,7 +23,7 @@ dataset:
         params:
             magnitude: 0.5 # [0, 1]
             p: 0.9 # [0, 1]
-            class_agnostic: false
+            class_agnostic: true
     fps: 25
     diff_step: 2
     joints: hands_and_feet # options: [hands, feet, hands_and_feet, hips, hands_and_hips, feet_and_hips, hands_and_feet_and_hips]
@@ -33,10 +33,10 @@ dataset:
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        # data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
-        data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
-        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
-        annotations_path: /Volumes/USB3/thesis/data/annotations_new.csv
+        data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
+        # data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
+        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations_new.csv
+        # annotations_path: /Volumes/USB3/thesis/data/annotations_new.csv
         num_folds: 10
     params_clips:
         sample_rate: 1
@@ -54,9 +54,9 @@ hparams:
         metric: val_loss
     save_best_threshold: 0.5 # save model if val_loss is better than threshold
     criterion: 
-        name: scripts.FM_classification.loss:CrossEntropyLoss
+        name: scripts.FM_classification.loss:WeightedCrossEntropyLoss
         params: # only used for WeightedCrossEntropyLoss
-            weights: [2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
+            weights: [500, 0.5] #[2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
     optimizer:
         name: scripts.FM_classification.optimizer:AdamW
         use_scheduler: true
@@ -96,11 +96,11 @@ hparams:
 logger:
     name: wandb
     enable: true
-    project: FM_classification_2class
+    project: FM_classification_2class_baseline
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    # path: /local_storage/users/tibbe/models/FM/TimeFormer/
-    path: /Volumes/USB3/thesis/models/FM/TimeFormer/
+    path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    # path: /Volumes/USB3/thesis/models/FM/TimeFormer/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth
