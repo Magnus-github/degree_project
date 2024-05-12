@@ -5,12 +5,12 @@ model:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
-        joint_in_channels: 7
-        joint_hidden_channels: 128
+        joint_in_channels: 16
+        joint_hidden_channels: 4
         num_encoder_layers: 1
         num_heads: 2
         num_joints: 4 # options: [2, 4, 6, 14, 18]
-        clip_len: 480
+        clip_len: 360
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:MaxPool
@@ -28,6 +28,7 @@ dataset:
     diff_step: 2
     joints: hands_and_feet # options: [hands, feet, hands_and_feet, hips, hands_and_hips, feet_and_hips, hands_and_feet_and_hips]
     mapping: {1: 0, 4: 0, 12: 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
+    class_names: ['FM+', 'FM_abnormal', 'FM-']
     sampling: 
         enable: true
         method: oversampling # options: [oversampling, undersampling]
@@ -36,12 +37,13 @@ dataset:
         data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
         # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
         annotations_path: /Volumes/USB3/thesis/data/annotations_new.csv
+        num_folds: 10
     params_clips:
         sample_rate: 1
         clip_length: 720
         max_overlap: 50
 hparams:
-    epochs: 1000
+    epochs: 400
     batch_size: 12
     validation_period: 1
     early_stopping:
@@ -93,7 +95,7 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: false
+    enable: true
     project: FM_classification_2class
 outputs:
     # path: /Midgard/Data/tibbe/models/FM

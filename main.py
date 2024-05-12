@@ -14,14 +14,14 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)s] [%(levelname)s] %(message)s")
 
-def train(cfg: DictConfig):
+def train(cfg: DictConfig, fold: int = 0):
     if cfg.test.enable:
         cfg.logger.enable = False
 
     if "dynamicClipSample" in cfg.dataset.name:
-        dataloaders = get_dataloaders_clips(cfg, fold=0)
+        dataloaders = get_dataloaders_clips(cfg, fold=fold)
     else:
-        dataloaders = get_dataloaders(cfg, fold=0)
+        dataloaders = get_dataloaders(cfg, fold=fold)
 
     if debugger_is_active():
         cfg.hparams.epochs = 1
@@ -109,10 +109,9 @@ if __name__ == "__main__":
     cfg = OmegaConf.load(args.config)
     logger.info(cfg)
 
-    if "VAE" in cfg.model.name:
-        pretrain(cfg)
-    else:    
-        train(cfg)
+    folds = range(cfg.dataset.params.num_folds)
+    for fold in folds:
+        train(cfg, fold=fold)
     
     # magnitude = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     # probs = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]

@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from sklearn.metrics import confusion_matrix
 
 from omegaconf import OmegaConf
 import os
@@ -29,12 +30,12 @@ class Trainer:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        if cfg.model.in_features == "kinematics_pos":
-            self._cfg.model.in_params.joint_in_channels = 2
-        elif cfg.model.in_features == "kinematics_vel":
-            self._cfg.model.in_params.joint_in_channels = 4
-        elif cfg.model.in_features == "kinematics_acc":
-            self._cfg.model.in_params.joint_in_channels = 6
+        # if cfg.model.in_features == "kinematics_pos":
+        #     self._cfg.model.in_params.joint_in_channels = 2
+        # elif cfg.model.in_features == "kinematics_vel":
+        #     self._cfg.model.in_params.joint_in_channels = 4
+        # elif cfg.model.in_features == "kinematics_acc":
+        #     self._cfg.model.in_params.joint_in_channels = 6
         self.model = str_to_class(cfg.model.name)(**cfg.model.in_params)
         if cfg.model.load_weights.enable:
             if cfg.test.enable:
@@ -45,6 +46,10 @@ class Trainer:
         self.train_dataloader = dataloaders['train']
         self.val_dataloader = dataloaders['val']
         self.test_dataloader = dataloaders['test']
+        if len(set(self._cfg.dataset.mapping.values())) == 3:
+            self.class_names = self._cfg.dataset.class_names
+        elif len(set(self._cfg.dataset.mapping.values())) == 2:
+            self.class_names = self._cfg.dataset.class_names[::len(self._cfg.dataset.class_names)-1]
         self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
         self.optimizer = str_to_class(cfg.hparams.optimizer.name)(self.model.parameters(), **cfg.hparams.optimizer.params)
         if "Adam" in cfg.hparams.optimizer.name and cfg.hparams.optimizer.use_scheduler is False:
@@ -201,24 +206,23 @@ class Trainer:
                     "Train Loss [epoch]": running_loss/len(self.train_dataloader),
                        "Train Accuracy": train_accuracy})
 
-            if (epoch+1) % self._cfg.hparams.validation_period == 0 or epoch == 0:
-                val_loss = self.validate(epoch)
+            val_loss, val_conf_mat = self.validate(epoch)
 
-                val_losses.append(val_loss)
-                if len(val_losses) > self._cfg.hparams.early_stopping.patience:
-                    val_losses.pop(0)
+            val_losses.append(val_loss)
+            if len(val_losses) > self._cfg.hparams.early_stopping.patience:
+                val_losses.pop(0)
 
-                    if self._cfg.hparams.early_stopping.enable and epoch > self._cfg.hparams.early_stopping.after_epoch:
-                        y = np.array(val_losses)
-                        slope, _ = np.polyfit(x, y, 1)
-                        if slope > self._cfg.hparams.early_stopping.slope_threshold:
-                            self.logger.info(f"Early stopping at epoch {epoch}.")
-                            self.save_model(epoch=epoch)
-                            break
+                if self._cfg.hparams.early_stopping.enable and epoch > self._cfg.hparams.early_stopping.after_epoch:
+                    y = np.array(val_losses)
+                    slope, _ = np.polyfit(x, y, 1)
+                    if slope > self._cfg.hparams.early_stopping.slope_threshold:
+                        self.logger.info(f"Early stopping at epoch {epoch}.")
+                        self.save_model(epoch=epoch)
+                        break
 
-                    if val_loss < best_val_loss and val_loss < self._cfg.hparams.save_best_threshold:
-                        best_val_loss = val_loss
-                        self.save_model(best=True)
+                if val_loss < best_val_loss and val_loss < self._cfg.hparams.save_best_threshold:
+                    best_val_loss = val_loss
+                    self.save_model(best=True)
 
             # if self.scheduler:
             #     if "ReduceLROnPlateau" in self._cfg.hparams.scheduler.name:
@@ -268,6 +272,7 @@ class Trainer:
                 # correct += (predicted == label).sum().item()
 
         accuracy = self.compute_accuracy(outputs, labels)
+        confusion_matrix = self.compute_confusion_matrix(outputs, labels)
         self.logger.info(f"Accuracy of the network on the {len(self.val_dataloader)} test sequences: {100*accuracy}%")
         self.logger.info(f"Validation loss: {running_val_loss/len(self.val_dataloader)}")
         # write output to file
@@ -278,13 +283,19 @@ class Trainer:
         f.write('Validation outputs and labels {}: \n{} \n'.format((epoch+1)//self._cfg.hparams.validation_period, torch.cat((outputs, labels.unsqueeze(1)), 1)))
         f.close()
 
+        val_loss = running_val_loss/len(self.val_dataloader)
         if not debugger_is_active() and self._cfg.logger.enable:
+            preds = [pred.item() for pred in outputs.argmax(dim=1)]
             wandb.log({"val_accuracy": accuracy,
-                   "val_loss": running_val_loss/len(self.val_dataloader)})
+                   "val_loss": val_loss,
+                   "val_conf_mat": wandb.plot.confusion_matrix(probs=None,
+                        y_true=[int(l.item()) for l in labels], preds=preds,
+                        class_names=self.class_names)})
+
         
         self.model.train()
 
-        return running_val_loss/len(self.val_dataloader)
+        return val_loss, confusion_matrix
     
     def test(self):
         self.model.eval()
@@ -328,6 +339,11 @@ class Trainer:
         total = labels.size(0)
         correct = (predicted == labels).sum().item()
         return correct / total
+    
+    def compute_confusion_matrix(self, outputs, labels):
+        _, predicted = torch.max(outputs, 1)
+        possible_labels = np.unique(labels.cpu().numpy())
+        return confusion_matrix(labels, predicted, labels=possible_labels)
 
     def save_model(self, epoch=None, best=False):
         path = os.path.join(self.output_dir, "model")

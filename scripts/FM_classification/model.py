@@ -146,24 +146,24 @@ class LearnablePositionalEncoding(nn.Module):
 class TimeFormer(torch.nn.Module):
     def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_encoder_layers=2, num_heads=4, num_joints=18, clip_len=240, num_classes=3, dropout=0.4, pool_method: str = None):
         super(TimeFormer, self).__init__()
-        self.cnn = nn.Conv1d(joint_in_channels, joint_hidden_channels, num_joints)
+        cnn_kernel_size = 5
+        cnn_stride = 1
+        self.cnn = nn.Conv1d(joint_in_channels, joint_hidden_channels, kernel_size=cnn_kernel_size, stride=cnn_stride, padding=cnn_kernel_size//2)
         # self.norm = nn.BatchNorm1d(joint_hidden_channels)
         self.pe = LearnablePositionalEncoding(joint_hidden_channels, clip_len)
         encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=num_heads, dim_feedforward=4*joint_hidden_channels, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
         self.dropout = nn.Dropout(dropout)
-        hidden_dim_mlp = 8*joint_hidden_channels
-        if hidden_dim_mlp < 64:
-            hidden_dim_mlp = 64
+        hidden_dim_mlp = 4*joint_hidden_channels
+        # if hidden_dim_mlp < 64:
+        #     hidden_dim_mlp = 64
         self.mlp = nn.Sequential(
             nn.Linear(joint_hidden_channels, hidden_dim_mlp),
             nn.ReLU(),
-            nn.Linear(hidden_dim_mlp, hidden_dim_mlp//2),
+            nn.Linear(hidden_dim_mlp, hidden_dim_mlp),
             nn.ReLU(),
-            nn.Linear(hidden_dim_mlp//2, hidden_dim_mlp//4),
-            nn.ReLU(),
-            nn.Linear(hidden_dim_mlp//4, num_classes)
+            nn.Linear(hidden_dim_mlp, num_classes)
         )
         self.pool_method = pool_method
         self.clip_len = clip_len
@@ -174,17 +174,18 @@ class TimeFormer(torch.nn.Module):
         t = self.clip_len
         x = x[:, T%t:] # cut the sequence to be divisible by t
         K = T//t
-        x = x.view(B, K, t, c, j)
-        x = x.reshape(B*K*t,c,j)
+        x = x.view(B*K, t, c*j)
+        x = x.permute(0,2,1).contiguous() # [B*K, c*j, t]
 
         # embed the joint dimension with CNN layer 
         x = self.cnn(x)
         x = F.sigmoid(x)
         x = self.dropout(x)
-        x = x.view(B*K, t, -1)
+        x = x.permute(0, 2, 1).contiguous() # [B*K, t, c*j]
+        # x = x.view(B*K, t, -1)
 
         # temporal transformer
-        BK, t, c_ = x.shape
+        # BK, t_, c_ = x.shape
         x = self.pe(x)
         x = self.transformer_encoder(x)
         x = F.gelu(x)

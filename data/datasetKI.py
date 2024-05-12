@@ -12,7 +12,7 @@ from sklearn.model_selection import StratifiedKFold
 
 
 class KIDataset(Dataset):
-    def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", transform = None, seed: int = 42, fold: int = 0):
+    def __init__(self, data_folder: str, annotations_path: str, num_folds: int = 10, mode: str = "train", transform = None, seed: int = 42, fold: int = 0):
         self.labels = []
         self.ids = {}
         self._get_labels_and_ids(annotations_path)
@@ -20,7 +20,7 @@ class KIDataset(Dataset):
         self.data_folder = data_folder
         all_data = os.listdir(self.data_folder)
 
-        skf = StratifiedKFold(n_splits=10, random_state=seed, shuffle=True)
+        skf = StratifiedKFold(n_splits=num_folds, random_state=seed, shuffle=True)
         splits = list(skf.split(all_data, self.labels))
         train_idx, val_test_idx = splits[fold]
 
