@@ -31,6 +31,8 @@ class KIDataset(Dataset):
         self.ids = {}
         self._get_labels_and_ids(annotations_path)
 
+        
+
         self.transform = transform
 
 
