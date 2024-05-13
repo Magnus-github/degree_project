@@ -9,8 +9,8 @@ model:
         joint_hidden_channels: 128
         num_encoder_layers: 1
         num_heads: 2
-        num_joints: 18 # options: [14, 18]
-        clip_len: 480
+        num_joints: 4 # options: [14, 18]
+        clip_len: 360
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:MaxPool
@@ -25,15 +25,18 @@ dataset:
             p: 0.9 # [0, 1]
             class_agnostic: false
     fps: 25
+    diff_step: 2
+    joints: hands_and_feet # options: [hands, hands_and_feet, feet, hips, hands_and_hips, hands_and_feet_and_hips, all]
     mapping: {'1': 0, '4': 0, '12': 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
     sampling: 
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
         # data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
-        data_folder:  /Volumes/USB3/thesis/data/poses_smooth_np/
+        data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
         # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations_new.csv
         annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
+        num_folds: 10
     params_clips:
         sample_rate: 1
         clip_length: 720

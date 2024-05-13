@@ -74,32 +74,42 @@ class Trainer:
             return features
         elif "kinematics" in name:
             # Compute differences for both x and y dimensions
-            t = 1 / self._cfg.dataset.fps
-            diff = pose_sequence[:, 1:, :, :-1] - pose_sequence[:, :-1, :, :-1]
+            step = self._cfg.dataset.diff_step
+            t = step / self._cfg.dataset.fps
+            diff = pose_sequence[:, step:] - pose_sequence[:, :-step]
             velocities = diff / t
-            velocities = torch.concat([torch.zeros(velocities.shape[0], 1, velocities.shape[2], velocities.shape[3]), velocities], dim=1)
+            velocities = torch.concat([torch.zeros(velocities.shape[0], step, velocities.shape[2], velocities.shape[3]), velocities], dim=1)
 
             # Compute diff of velocities in x and y
-            diff_v = velocities[:, 1:] - velocities[:, :-1]
+            diff_v = velocities[:, step:] - velocities[:, :-step]
             accelerations = diff_v / t
-            accelerations = torch.concat([torch.zeros(accelerations.shape[0], 1, accelerations.shape[2], accelerations.shape[3]), accelerations], dim=1)
+            accelerations = torch.concat([torch.zeros(accelerations.shape[0], step, accelerations.shape[2], accelerations.shape[3]), accelerations], dim=1)
 
             # calculate the total distance traveled by each joint in the sequence
-            distances = torch.zeros(velocities.shape)
-            for i in range(1, pose_sequence.shape[1]):
-                distances[:, i, :, :] = distances[:, i-1, :, :] + velocities[:, i-1, :, :]*t + 0.5*accelerations[:, i-1, :, :]*t**2
+            # distances = torch.zeros(velocities.shape)
+            # for i in range(1, pose_sequence.shape[1]):
+            #     distances[:, i, :, :] = distances[:, i-1, :, :] + velocities[:, i-1, :, :]*t + 0.5*accelerations[:, i-1, :, :]*t**2
 
             # distances = np.sqrt(distances[:, :, :, 0]**2 + distances[:, :, :, 1]**2)
-            distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
+            # distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
 
-            # shape: [B, T, J, 7]
-            features = torch.concat([pose_sequence[:,:,:,:2], velocities, accelerations, distances], dim=3)
+            # shape: [B, T, J, 6]
+            features = torch.concat([pose_sequence, velocities, accelerations], dim=3)
             features = features.permute(0,1,3,2)
-            # shape: [B, T, 7, J]
+            # shape: [B, T, 6, J]
             features = features.float()
 
-            if self._cfg.model.in_params.num_joints == 14:
-                features = features[:, :, :, :14]
+            joint_ids = []
+            if "hands" in self._cfg.dataset.joints:
+                joint_ids.extend([4, 7])
+            if "feet" in self._cfg.dataset.joints:
+                joint_ids.extend([10, 13])
+            if "hips" in self._cfg.dataset.joints:
+                joint_ids.extend([8, 11])
+            if self._cfg.dataset.joints == "all":
+                joint_ids = list(range(14))
+            
+            features = features[:, :, :, joint_ids]
 
             if name == "kinematics":
                 return features

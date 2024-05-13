@@ -17,18 +17,19 @@ class KIDataset(Dataset):
         self.ids = {}
         labels = self._get_labels_and_ids(annotations_path)
 
-        self.labels = [labels[self.ids[int(file.split("_")[1])]] for file in all_data]
+        all_labels = [labels[self.ids[int(file.split("_")[1])]] for file in all_data]
         skf = StratifiedKFold(n_splits=num_folds, random_state=seed, shuffle=True)
-        splits = list(skf.split(all_data, self.labels))
+        splits = list(skf.split(all_data, all_labels))
         train_idx, val_test_idx = splits[fold]
 
         if mode == "train":
             self.data = [all_data[i] for i in train_idx]
+            self.labels = [all_labels[i] for i in train_idx]
         if mode == "val":
             self.data = [all_data[i] for i in val_test_idx]
+            self.labels = [all_labels[i] for i in val_test_idx]
 
         self.transform = transform
-
 
     def __len__(self):
         return len(self.data)
@@ -51,8 +52,7 @@ class KIDataset(Dataset):
         
         pose_sequence = data
 
-        id = int(pose_file.split("_")[1])
-        label = self.labels[self.ids[id]]
+        label = self.labels[idx]
 
         if self.transform and self.transform.class_agnostic:
             pose_sequence = self.transform(pose_sequence)
@@ -68,9 +68,10 @@ class KIDataset(Dataset):
 class KIDataset_dynamicClipSample(KIDataset):
     def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/poses_smooth_np/",
                  annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
+                 num_folds: int = 10, fold: int = 0,
                  mode: str = "train", transform = None, seed: int = 42,
                  sample_rate: int = 2, clip_length: int = 720, max_overlap: int = 50):
-        super().__init__(data_folder, annotations_path, mode, transform, seed)
+        super().__init__(data_folder, annotations_path, num_folds, mode, transform, seed, fold)
         self.sample_rate = sample_rate
         self.clip_length = clip_length
         self.stride = clip_length - max_overlap
@@ -83,8 +84,7 @@ class KIDataset_dynamicClipSample(KIDataset):
         
         pose_sequence = data
 
-        id = int(pose_file.split("_")[1])
-        label = self.labels[self.ids[id]]
+        label = self.labels[idx]
 
         if self.transform and self.transform.class_agnostic:
             pose_sequence = self.transform(pose_sequence)
