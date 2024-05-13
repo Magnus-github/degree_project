@@ -7,29 +7,25 @@ import time
 from tqdm import tqdm
 import random
 from sklearn.utils.class_weight import compute_class_weight
+from sklearn.model_selection import StratifiedKFold
 
 
 class KIDataset(Dataset):
-    def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", transform = None, seed: int = 42):
+    def __init__(self, data_folder: str, annotations_path: str, num_folds: int = 10, mode: str = "train", transform = None, seed: int = 42, fold: int = 0):
         self.data_folder = data_folder
         all_data = os.listdir(self.data_folder)
-        random.seed(seed)
-        train_data = random.sample(all_data, int(0.8*len(all_data)))
-        val_test_data = sorted(list(set(all_data) - set(train_data)))
-        val_data = random.sample(val_test_data, int(0.5*len(val_test_data)))
-        test_data = sorted(list(set(val_test_data) - set(val_data)))
-        self.test = False
-        if mode == "train":
-            self.data = train_data
-        if mode == "val":
-            self.data = val_data
-        if mode == "test":
-            self.data = test_data
-            self.test = True
-
-        self.labels = []
         self.ids = {}
-        self._get_labels_and_ids(annotations_path)
+        labels = self._get_labels_and_ids(annotations_path)
+
+        self.labels = [labels[self.ids[int(file.split("_")[1])]] for file in all_data]
+        skf = StratifiedKFold(n_splits=num_folds, random_state=seed, shuffle=True)
+        splits = list(skf.split(all_data, self.labels))
+        train_idx, val_test_idx = splits[fold]
+
+        if mode == "train":
+            self.data = [all_data[i] for i in train_idx]
+        if mode == "val":
+            self.data = [all_data[i] for i in val_test_idx]
 
         self.transform = transform
 
@@ -38,14 +34,15 @@ class KIDataset(Dataset):
         return len(self.data)
     
     def _get_labels_and_ids(self, annotations_path: str):
+        labels = []
         with open(annotations_path, 'r', encoding='utf-8-sig') as file:
             reader = csv.reader(file, delimiter=';', )
             for i,row in enumerate(reader):
                 if i == 0:
                     continue
                 self.ids[int(row[0])] = i-1
-                self.labels.append(row[1])
-
+                labels.append(row[1])
+        return labels
     
     def __getitem__(self, idx):
         pose_file = self.data[idx]
