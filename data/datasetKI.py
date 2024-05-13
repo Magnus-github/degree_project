@@ -60,8 +60,8 @@ class KIDataset(Dataset):
             if label == "1" or label == "4":
                 pose_sequence = self.transform(pose_sequence)
 
-        if self.test:
-            return pose_sequence, label, id
+        # if self.test:
+        #     return pose_sequence, label, id
         return pose_sequence, label
     
 
