@@ -75,7 +75,7 @@ class Trainer:
         elif "kinematics" in name:
             # Compute differences for both x and y dimensions
             t = 1 / self._cfg.dataset.fps
-            diff = pose_sequence[:, 1:,:,:-1] - pose_sequence[:, :-1,:,:-1]
+            diff = pose_sequence[:, 1:,:,:2] - pose_sequence[:, :-1,:,:2]
             velocities = diff / t
             velocities = torch.concat([torch.zeros(velocities.shape[0], 1, velocities.shape[2], velocities.shape[3]), velocities], dim=1)
 
@@ -98,8 +98,8 @@ class Trainer:
             # shape: [B, T, 7, J]
             features = features.float()
 
-            features = features[:, :, :, [4,7,10,13]]
-            # features = features[:,:,:,:14]
+            # features = features[:, :, :, [4,7,10,13]]
+            features = features[:,:,:,:14]
 
             if name == "kinematics":
                 return features
@@ -126,8 +126,8 @@ class Trainer:
         self.model.train()
         self.logger.info("Starting training...")
         # num_samples = len(self.train_dataloader)*self._cfg.hparams.batch_size - 
-        outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, self._cfg.model.in_params.num_classes)
-        labels = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size)
+        # outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, self._cfg.model.in_params.num_classes)
+        # labels = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size)
         val_losses = []
         x = np.arange(0, self._cfg.hparams.early_stopping.patience)
         val_loss = np.inf
@@ -136,6 +136,8 @@ class Trainer:
         last_lr = self.optimizer.param_groups[0]['lr']
         for epoch in range(self._cfg.hparams.epochs):
             running_loss = 0.0
+            outputs = []
+            labels = []
             for i, (data) in enumerate(tqdm(self.train_dataloader)):
                 if len(data) == 3:
                     pose_sequence, target, count = data
@@ -146,7 +148,8 @@ class Trainer:
                     pose_sequence = pose_sequence.view(B*n_samples, T, J, C)
 
                 label = torch.tensor([self.class_mapping[t] for t in target])
-                labels[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(label)] = label
+                # labels[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(label)] = label
+                labels.append(label)
                 # pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)
 
@@ -157,7 +160,8 @@ class Trainer:
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
                 output = self.model(features)
-                outputs[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(output)] = output.softmax(axis=1)
+                # outputs[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(output)] = output.softmax(axis=1)
+                outputs.append(output.softmax(axis=1))
                 loss = self.criterion(output, label)
                 loss.backward()
                 self.optimizer.step()
@@ -174,9 +178,12 @@ class Trainer:
                         last_lr = self.optimizer.param_groups[0]['lr']
                         wandb.log({"Learning Rate": last_lr})
 
+            outputs = torch.cat(outputs, 0)
+            labels = torch.cat(labels, 0)
             train_accuracy = self.compute_accuracy(outputs, labels)
             
             self.logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
+            self.logger.info(f"Epoch {epoch} accuracy: {100*train_accuracy}%")
             if not debugger_is_active() and self._cfg.logger.enable:
                 wandb.log({"Epoch": epoch,
                     "Train Loss [epoch]": running_loss/len(self.train_dataloader),
@@ -305,7 +312,7 @@ class Trainer:
         return
 
     def compute_accuracy(self, outputs, labels):
-        _, predicted = torch.max(outputs, 1)
+        predicted = torch.argmax(outputs, 1)
         total = labels.size(0)
         correct = (predicted == labels).sum().item()
         return correct / total
