@@ -31,8 +31,6 @@ class KIDataset(Dataset):
         self.ids = {}
         self._get_labels_and_ids(annotations_path)
 
-        
-
         self.transform = transform
 
 
@@ -79,7 +77,6 @@ class KIDataset_dynamicClipSample(KIDataset):
         self.sample_rate = sample_rate
         self.clip_length = clip_length
         self.stride = clip_length - max_overlap
-        print(len(self.data))
 
     def __getitem__(self, idx):
         pose_file = self.data[idx]
@@ -110,13 +107,15 @@ class KIDataset_dynamicClipSample(KIDataset):
         elif n_frames > self.clip_length:
             sample_pool = list(range(0, n_frames - self.clip_length, self.stride))
             for i in range(self.sample_rate):
-                start = random.choice(sample_pool)
-                pose_clips.append(pose_sequence[start:start+self.clip_length])
-                sample_pool.remove(start)
+               start = random.choice(sample_pool)
+               pose_clips.append(pose_sequence[start:start+self.clip_length])
+               sample_pool.remove(start)
 
         pose_clips = np.array(pose_clips)
+        # assert n_frames >= self.clip_length, f"Clip length {self.clip_length} is longer than sequence length {n_frames}."
+        # pose_clips = torch.tensor(pose_sequence).unfold(0, self.clip_length, self.stride)
 
-        # ratio = self.clip_length / n_frames
+        # label = torch.tensor([int(label)]*pose_clips.shape[0])
 
         return pose_clips, label
     

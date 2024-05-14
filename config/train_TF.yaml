@@ -9,8 +9,8 @@ model:
         joint_hidden_channels: 128
         num_encoder_layers: 1
         num_heads: 2
-        num_joints: 14 # options: [14, 18]
-        clip_len: 480
+        num_joints: 4 # options: [14, 18]
+        clip_len: 360
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:MaxPool
@@ -21,16 +21,16 @@ dataset:
         enable: true
         name: data.augmentations:RandScale
         params:
-            magnitude: 0.5 # [0, 1]
+            magnitude: 0.75 # [0, 1]
             p: 0.9 # [0, 1]
-            class_agnostic: false
+            class_agnostic: true
     fps: 25
     mapping: {'1': 0, '4': 0, '12': 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
     sampling: 
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
+        data_folder: /Midgard/Data/tibbe/datasets/own/poses_smooth_np/
         # data_folder:  /Volumes/USB3/thesis/data/poses_smooth_np/
         annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
         # annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
@@ -40,7 +40,7 @@ dataset:
         max_overlap: 50
 hparams:
     epochs: 1000
-    batch_size: 24
+    batch_size: 12
     validation_period: 1
     early_stopping:
         enable: false
@@ -91,7 +91,7 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
     path: /local_storage/users/tibbe/models/FM/TimeFormer/
