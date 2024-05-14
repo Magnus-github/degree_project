@@ -159,7 +159,7 @@ class Trainer:
                     pose_sequence, target, count = data
                 else:
                     pose_sequence, target = data
-                if len(pose_sequence.shape) == 5:
+                if  len(pose_sequence.shape) == 5:
                     B, n_samples, T, J, C = pose_sequence.shape
                     pose_sequence = pose_sequence.view(B*n_samples, T, J, C)
 

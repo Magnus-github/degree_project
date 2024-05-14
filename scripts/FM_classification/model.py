@@ -146,12 +146,12 @@ class LearnablePositionalEncoding(nn.Module):
 class TimeFormer(torch.nn.Module):
     def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_encoder_layers=2, num_heads=4, num_joints=18, clip_len=240, num_classes=3, dropout=0.4, pool_method: str = None):
         super(TimeFormer, self).__init__()
-        cnn_kernel_size = 5
-        cnn_stride = 1
-        self.cnn = nn.Conv1d(joint_in_channels, joint_hidden_channels, kernel_size=cnn_kernel_size, stride=cnn_stride, padding=cnn_kernel_size//2)
+        cnn_kernel_size = 25
+        cnn_stride = 5
+        self.cnn = nn.Conv1d(joint_in_channels, joint_hidden_channels, kernel_size=cnn_kernel_size, stride=cnn_stride)
         # self.norm = nn.BatchNorm1d(joint_hidden_channels)
         self.pe = LearnablePositionalEncoding(joint_hidden_channels, clip_len)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=num_heads, dim_feedforward=4*joint_hidden_channels, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=num_heads, dim_feedforward=joint_hidden_channels, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
         self.dropout = nn.Dropout(dropout)
@@ -168,10 +168,20 @@ class TimeFormer(torch.nn.Module):
 
     def forward(self, x):
         B, T, c, j = x.shape
-        # split the sequence into subsequences of length t
-        t = self.clip_len
-        x = x[:, T%t:] # cut the sequence to be divisible by t
-        K = T//t
+
+        if not self.training:
+            # self.dropout = nn.Dropout(0.0)
+            # split the sequence into subsequences of length t
+            t = 750
+            x = x[:, T%t:] # cut the sequence to be divisible by t
+            K = T//t
+            x = x.view(B*K, t, c, j)
+
+        if self.training:
+            K = 1
+            t = T
+            x = x.view(B*K, t, c, j)
+    
         x = x.reshape(B*K, t, c*j)
         x = x.permute(0,2,1).contiguous() # [B*K, c*j, t]
 

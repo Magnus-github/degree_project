@@ -6,11 +6,11 @@ model:
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
         joint_in_channels: 16
-        joint_hidden_channels: 4
+        joint_hidden_channels: 128
         num_encoder_layers: 1
         num_heads: 2
         num_joints: 4 # options: [2, 4, 6, 14, 18]
-        clip_len: 240
+        clip_len: 146
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:MaxPool
@@ -33,15 +33,15 @@ dataset:
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
-        # data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
-        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations_new.csv
-        # annotations_path: /Volumes/USB3/thesis/data/annotations_new.csv
+        # data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
+        data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
+        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations_new.csv
+        annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
         num_folds: 10
     params_clips:
         sample_rate: 1
-        clip_length: 720
-        max_overlap: 50
+        clip_length: 750
+        max_overlap: 0
 hparams:
     epochs: 400
     batch_size: 12
@@ -99,8 +99,8 @@ logger:
     project: FM_classification_2class_baseline
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    path: /local_storage/users/tibbe/models/FM/TimeFormer/
-    # path: /Volumes/USB3/thesis/models/FM/TimeFormer/
+    # path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    path: /Volumes/USB3/thesis/models/FM/TimeFormer/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth

@@ -53,7 +53,8 @@ def get_dataloaders_clips(cfg: DictConfig, fold: int):
     val_dataset = str_to_class(dataset_name)(**cfg.dataset.params, mode="val", fold=fold)
     test_dataset = str_to_class(dataset_name)(**cfg.dataset.params, mode="test", fold=fold)
 
-    labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
+    # labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
+    labels_train = train_dataset.labels
     y_train = [cfg.dataset.mapping[int(label)] for label in labels_train]
     if cfg.dataset.sampling.enable:
         class_sample_count = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
