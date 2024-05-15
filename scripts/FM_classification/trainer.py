@@ -13,7 +13,7 @@ import sys
 sys.path.append(os.curdir)
 
 from scripts.utils.str_to_class import str_to_class
-from data.dataloaders import get_dataloaders, get_dataloaders_clips
+from data.dataloaders import get_dataloaders, get_dataloaders_clips, get_sparse_edge_indices_14
 from scripts.utils.check_debugger import debugger_is_active
 
 
@@ -45,6 +45,7 @@ class Trainer:
         self.train_dataloader = dataloaders['train']
         self.val_dataloader = dataloaders['val']
         self.test_dataloader = dataloaders['test']
+        self.edge_indices = get_sparse_edge_indices_14().to(self.device)
         self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
         self.optimizer = str_to_class(cfg.hparams.optimizer.name)(self.model.parameters(), **cfg.hparams.optimizer.params)
         if "Adam" in cfg.hparams.optimizer.name and cfg.hparams.optimizer.use_scheduler is False:
@@ -99,10 +100,9 @@ class Trainer:
             # shape: [B, T, 7, J]
             features = features.float()
 
-            # if self._cfg.model.in_params.num_joints == 14:
-            #     features = features[:, :, :, :14]
+            features = features[:, :, :, :14]
 
-            features = features[:, :, :, [4, 7, 10, 13]]
+            # features = features[:, :, :, [4, 7, 10, 13]]
 
             if name == "kinematics":
                 return features
@@ -159,7 +159,7 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
-                output = self.model(features)
+                output = self.model(features, edges=self.edge_indices)
                 outputs[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(output)] = output.softmax(axis=1)
                 loss = self.criterion(output, label)
                 loss.backward()
@@ -243,7 +243,7 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
-                output = self.model(features)
+                output = self.model(features, edges=self.edge_indices)
                 outputs[i] = output.softmax(axis=1)
                 val_loss = self.criterion(output, label)
                 running_val_loss += val_loss.item()

@@ -168,7 +168,7 @@ class TimeFormer(torch.nn.Module):
         self.pool_method = pool_method
         self.clip_len = clip_len
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         B, T, c, j = x.shape
         # split the sequence into subsequences of length t
         t = self.clip_len
@@ -200,7 +200,68 @@ class TimeFormer(torch.nn.Module):
         vid_cls = pool(vid_cls).squeeze(dim=-1)
 
         return vid_cls
+    
 
+import torch_geometric.nn as gnn
+
+class GCN_TimeFormer(nn.Module):
+    def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_encoder_layers=2, num_heads=4, num_joints=18, clip_len=240, num_classes=3, dropout=0.4, pool_method: str = None):
+        super(GCN_TimeFormer, self).__init__()
+
+        self.gcn = gnn.GCNConv(joint_in_channels, joint_hidden_channels)
+        joint_hidden_channels = joint_hidden_channels*num_joints
+        self.pe = LearnablePositionalEncoding(joint_hidden_channels, clip_len)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=num_heads, dim_feedforward=4*joint_hidden_channels, batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
+        self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
+        self.dropout = nn.Dropout(dropout)
+        hidden_dim_mlp = 64#8*joint_hidden_channels
+        if hidden_dim_mlp < 64:
+            hidden_dim_mlp = 64
+        self.mlp = nn.Sequential(
+            nn.Linear(joint_hidden_channels, hidden_dim_mlp),
+            nn.ReLU(),
+            nn.Linear(hidden_dim_mlp, hidden_dim_mlp//2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim_mlp//2, hidden_dim_mlp//4),
+            nn.ReLU(),
+            nn.Linear(hidden_dim_mlp//4, num_classes)
+        )
+        self.pool_method = pool_method
+        self.clip_len = clip_len
+
+    def forward(self, x, **kwargs):
+        edges = kwargs["edges"]
+        B, T, c, j = x.shape
+        # split the sequence into subsequences of length t
+        t = self.clip_len
+        x = x[:, T%t:]
+        K = T//t
+        x = x.view(B, K, t, c, j)
+        x = x.reshape(B*K*t,c,j)
+        x = x.permute(0, 2, 1)
+
+        # embed the joint dimension with GCN layer
+        x = self.gcn(x, edges)
+        x = F.sigmoid(x)
+        x = self.dropout(x)
+        x = x.view(B*K, t, -1)
+
+        # temporal transformer
+        BK, t, c_ = x.shape
+        x = self.pe(x)
+        x = self.transformer_encoder(x)
+        x = F.gelu(x)
+        x = self.attention(x)
+        x = self.dropout(x)
+        
+        clip_cls = self.mlp(x)
+
+        pool = nn.MaxPool1d(K)
+        vid_cls = clip_cls.view(B, K, -1).permute(0, 2, 1)
+        vid_cls = pool(vid_cls).squeeze(dim=-1)
+
+        return vid_cls
 
 if __name__ == "__main__":
     example = torch.randn(20, 240*3, 2, 14, 14)

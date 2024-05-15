@@ -76,3 +76,33 @@ def get_dataloaders_clips(cfg):
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     return {"train": train_dataloader, "val": val_dataloader, "test": test_dataloader}
+
+
+def get_sparse_edge_indices_14():
+    matrix = torch.tensor([
+        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+    ]).float().to_sparse()
+
+    return matrix.indices()
+
+
+def collate_fn(batch):
+    pose_sequences = [item[0] for item in batch]
+
+    pose_sequences = torch.concat(pose_sequences, dim=0)
+    labels = [item[1] for item in batch]
+    labels = torch.concat(labels, dim=0)
+    return pose_sequences, labels

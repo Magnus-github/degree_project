@@ -1,15 +1,15 @@
 model:
-    name: scripts.FM_classification.model:TimeFormer
+    name: scripts.FM_classification.model:GCN_TimeFormer
     in_features: kinematics_vel # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
     load_weights:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
         joint_in_channels: 4
-        joint_hidden_channels: 16
+        joint_hidden_channels: 4
         num_encoder_layers: 1
         num_heads: 2
-        num_joints: 4 # options: [14, 18]
+        num_joints: 14 # options: [14, 18]
         clip_len: 360
         num_classes: 2
         dropout: 0.6
@@ -30,10 +30,10 @@ dataset:
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
-        # data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
-        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
-        # annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
+        # data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
+        data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
+        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
     params_clips:
         sample_rate: 1
         clip_length: 720
@@ -91,11 +91,11 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    path: /local_storage/users/tibbe/models/FM/TimeFormer/
-    # path: /Volumes/USB3/thesis/models/FM/TimeFormer/
+    # path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    path: /Volumes/USB3/thesis/models/FM/TimeFormer/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth
