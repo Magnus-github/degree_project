@@ -155,13 +155,11 @@ class TimeFormer(torch.nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
         self.dropout = nn.Dropout(dropout)
-        hidden_dim_mlp = 4*joint_hidden_channels
+        hidden_dim_mlp = joint_hidden_channels
         # if hidden_dim_mlp < 64:
         #     hidden_dim_mlp = 64
         self.mlp = nn.Sequential(
             nn.Linear(joint_hidden_channels, hidden_dim_mlp),
-            nn.ReLU(),
-            nn.Linear(hidden_dim_mlp, hidden_dim_mlp),
             nn.ReLU(),
             nn.Linear(hidden_dim_mlp, num_classes)
         )
@@ -174,7 +172,7 @@ class TimeFormer(torch.nn.Module):
         t = self.clip_len
         x = x[:, T%t:] # cut the sequence to be divisible by t
         K = T//t
-        x = x.view(B*K, t, c*j)
+        x = x.reshape(B*K, t, c*j)
         x = x.permute(0,2,1).contiguous() # [B*K, c*j, t]
 
         # embed the joint dimension with CNN layer 
@@ -189,6 +187,7 @@ class TimeFormer(torch.nn.Module):
         x = self.pe(x)
         x = self.transformer_encoder(x)
         x = F.gelu(x)
+        
         x = self.attention(x)
         x = self.dropout(x)
 

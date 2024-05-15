@@ -198,7 +198,7 @@ class Trainer:
 
 
             outputs = torch.cat(outputs, 0)
-            labels = torch.tensor(labels)
+            labels = torch.tensor(labels, device=self.device)
             train_accuracy = self.compute_accuracy(outputs, labels)
             
             self.logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
