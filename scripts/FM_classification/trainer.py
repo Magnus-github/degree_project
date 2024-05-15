@@ -83,6 +83,7 @@ class Trainer:
             t = step / self._cfg.dataset.fps
             diff = pose_sequence[:, step:] - pose_sequence[:, :-step]
             velocities = diff * t
+            velocities = torch.sqrt(velocities[:, :, :, 0]**2 + velocities[:, :, :, 1]**2).unsqueeze(-1)
             velocities = torch.concat([torch.zeros(velocities.shape[0], step, velocities.shape[2], velocities.shape[3]), velocities], dim=1)
             # scaled_velocities = velocities / torch.linalg.norm(velocities, axis=-1).unsqueeze(-1)
 

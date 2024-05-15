@@ -83,9 +83,10 @@ class KIDataset(Dataset):
 class KIDataset_dynamicClipSample(KIDataset):
     def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/poses_smooth_np/",
                  annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
+                 num_folds: int = 10,
                  mode: str = "train", transform = None, seed: int = 42, fold: int = 0,
                  sample_rate: int = 2, clip_length: int = 720, max_overlap: int = 50):
-        super().__init__(data_folder, annotations_path, mode, transform, seed, fold)
+        super().__init__(data_folder, annotations_path, num_folds, mode, transform, seed, fold)
         self.sample_rate = sample_rate
         self.clip_length = clip_length
         self.stride = clip_length - max_overlap

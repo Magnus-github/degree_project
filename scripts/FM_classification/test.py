@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 
-from optimizer import CosineDecayWithWarmUpScheduler
+from optimizer import CosineDecayWithWarmUpScheduler, CyclicCosineDecayLR
 import sys
 sys.path.append(".")
 from data.dataloaders import get_dataloaders
@@ -11,22 +11,24 @@ import omegaconf
 
 
 def test_learning_rate_schedule():
-    cfg = omegaconf.OmegaConf.load("config/train_AE.yaml")
+    cfg = omegaconf.OmegaConf.load("config/train_TF.yaml")
 
     optim = torch.optim.Adam([torch.tensor(1.0)], lr=1e-3)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim, T_0=10, T_mult=2)
-    scheduler = CosineDecayWithWarmUpScheduler(optim, **cfg.hparams.scheduler.params)
+    scheduler = CyclicCosineDecayLR(optim, **cfg.hparams.scheduler.params)
 
+    lr = []
     for i in range(cfg.hparams.epochs):
-        for j in range(cfg.hparams.scheduler.params.step_per_epoch):
+        for j in range(cfg.hparams.scheduler.params_CSWU.step_per_epoch):
             optim.step()
-            scheduler.step()
+        scheduler.step()
+        lr.append(scheduler.get_last_lr()[0])
             
 
     print("Plotting...")
-    print(len(scheduler.lr_list))
+    print(len(lr))
     plt.figure()
-    plt.plot(scheduler.lr_list)
+    plt.plot(lr)
     plt.savefig("cosine_decay.png")
 
 

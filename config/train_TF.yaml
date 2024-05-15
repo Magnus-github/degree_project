@@ -68,15 +68,24 @@ hparams:
             lr: 0.001
             weight_decay: 0.0001
     scheduler:
-        name: scripts.FM_classification.optimizer:CosineDecayWithWarmUpScheduler
+        name: scripts.FM_classification.optimizer:CyclicCosineDecayLR
         params:
+            init_decay_epochs: 500
+            min_decay_lr: 0.001
+            restart_interval: 800
+            restart_interval_multiplier:
+            restart_lr: 0.001
+            warmup_epochs: 100
+            warmup_start_lr: 0.0001
+            last_epoch: -1
+        params_CSWU:
             step_per_epoch: 5
             init_warmup_lr: 0.0005
             warm_up_steps: 200 # 20 epochs
             max_lr: 0.001
-            min_lr: 0.0005
-            num_step_down: 500 # 300 epochs
-            num_step_up: 0 # None (empty is none)
+            min_lr: 0.0006
+            num_step_down:  600 # 300 epochs
+            num_step_up: 600 # None (empty is none)
             T_mul: 1
             max_lr_decay: Exp
             gamma: 0.5
@@ -95,7 +104,7 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
     project: FM_classification_2class
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
