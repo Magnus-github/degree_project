@@ -175,13 +175,13 @@ class TimeFormer(torch.nn.Module):
         x = x[:, T%t:] # cut the sequence to be divisible by t
         K = T//t
         x = x.view(B, K, t, c, j)
-        x = x.reshape(B*K*t,c,j)
+        x = x.reshape(B*K,t,c*j)
 
         # embed the joint dimension with CNN layer 
-        x = self.cnn(x)
-        x = F.sigmoid(x)
-        x = self.dropout(x)
-        x = x.view(B*K, t, -1)
+        # x = self.cnn(x)
+        # x = F.sigmoid(x)
+        # x = self.dropout(x)
+        # x = x.view(B*K, t, -1)
 
         # temporal transformer
         BK, t, c_ = x.shape
