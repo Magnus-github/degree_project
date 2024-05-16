@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)s] [%(levelname)s] %(message)s")
 
-def main(cfg: DictConfig):
+def train_and_eval(cfg: DictConfig, fold: int = 0):
     if cfg.test.enable:
         cfg.logger.enable = False
 
     if "dynamicClipSample" in cfg.dataset.name:
-        dataloaders = get_dataloaders_clips(cfg)
+        dataloaders = get_dataloaders_clips(cfg, fold=fold)
     else:
-        dataloaders = get_dataloaders(cfg)
+        dataloaders = get_dataloaders(cfg, fold=fold)
 
     if debugger_is_active():
         cfg.hparams.epochs = 1
@@ -49,13 +49,14 @@ def main(cfg: DictConfig):
         trainer.test()
         logger.info("Testing finished.")
     else:
-        trainer.train()
+        metrics = trainer.train()
         logger.info("Training finished.")
 
     if cfg.logger.enable:
         wandb.finish()
 
     logger.info("Done!")
+    return metrics
 
 
 if __name__ == "__main__":
@@ -64,7 +65,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     cfg = OmegaConf.load(args.config)
     logger.info(cfg)
-    main(cfg)
+
+    folds = range(10)
+    all_metrics = {f"fold_{fold}": {} for fold in folds}
+    for fold in range(cfg.dataset.params.num_folds):
+        metrics_fold = train_and_eval(cfg, fold=fold)
+        all_metrics[f"fold_{fold}"] = metrics_fold
     
     # magnitude = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     # probs = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]

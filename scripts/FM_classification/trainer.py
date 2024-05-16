@@ -44,7 +44,7 @@ class Trainer:
             self.model.load_state_dict(torch.load(weights_path, map_location=self.device))
         self.train_dataloader = dataloaders['train']
         self.val_dataloader = dataloaders['val']
-        self.test_dataloader = dataloaders['test']
+        # self.test_dataloader = dataloaders['test']
         self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
         self.optimizer = str_to_class(cfg.hparams.optimizer.name)(self.model.parameters(), **cfg.hparams.optimizer.params)
         if "Adam" in cfg.hparams.optimizer.name and cfg.hparams.optimizer.use_scheduler is False:
@@ -74,27 +74,28 @@ class Trainer:
             return features
         elif "kinematics" in name:
             # Compute differences for both x and y dimensions
-            t = 1 / self._cfg.dataset.fps
-            diff = pose_sequence[:, 1:, :, :2] - pose_sequence[:, :-1, :, :2]
+            step = self._cfg.dataset.diff_step
+            t = step / self._cfg.dataset.fps
+            diff = pose_sequence[:, step:, :, :2] - pose_sequence[:, :-step, :, :2]
             velocities = diff / t
             # velocities = torch.sqrt(velocities[:, :, :, 0]**2 + velocities[:, :, :, 1]**2).unsqueeze(-1)
-            velocities = torch.concat([torch.zeros(velocities.shape[0], 1, velocities.shape[2], velocities.shape[3]), velocities], dim=1)
+            velocities = torch.concat([torch.zeros(velocities.shape[0], step, velocities.shape[2], velocities.shape[3]), velocities], dim=1)
 
             # Compute diff of velocities in x and y
-            diff_v = velocities[:, 1:] - velocities[:, :-1]
+            diff_v = velocities[:, step:] - velocities[:, :-step]
             accelerations = diff_v / t
-            accelerations = torch.concat([torch.zeros(accelerations.shape[0], 1, accelerations.shape[2], accelerations.shape[3]), accelerations], dim=1)
+            accelerations = torch.concat([torch.zeros(accelerations.shape[0], step, accelerations.shape[2], accelerations.shape[3]), accelerations], dim=1)
 
             # calculate the total distance traveled by each joint in the sequence
-            distances = torch.zeros(velocities.shape)
-            for i in range(1, pose_sequence.shape[1]):
-                distances[:, i, :, :] = distances[:, i-1, :, :] + velocities[:, i-1, :, :]*t + 0.5*accelerations[:, i-1, :, :]*t**2
+            # distances = torch.zeros(velocities.shape)
+            # for i in range(1, pose_sequence.shape[1]):
+            #     distances[:, i, :, :] = distances[:, i-1, :, :] + velocities[:, i-1, :, :]*t + 0.5*accelerations[:, i-1, :, :]*t**2
 
-            # distances = np.sqrt(distances[:, :, :, 0]**2 + distances[:, :, :, 1]**2)
-            distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
+            # # distances = np.sqrt(distances[:, :, :, 0]**2 + distances[:, :, :, 1]**2)
+            # distances = torch.linalg.norm(distances, axis=-1).unsqueeze(-1)
 
             # shape: [B, T, J, 7]
-            features = torch.concat([pose_sequence[:,:,:,:2], velocities, accelerations, distances], dim=3)
+            features = torch.concat([pose_sequence[:,:,:,:2], velocities, accelerations], dim=3)
             features = features.permute(0,1,3,2)
             # shape: [B, T, 7, J]
             features = features.float()
@@ -102,7 +103,17 @@ class Trainer:
             # if self._cfg.model.in_params.num_joints == 14:
             #     features = features[:, :, :, :14]
 
-            features = features[:, :, :, [4, 7, 10, 13]]
+            joint_ids = []
+            if "hands" in self._cfg.dataset.joints:
+                joint_ids.extend([4, 7])
+            if "feet" in self._cfg.dataset.joints:
+                joint_ids.extend([10, 13])
+            if "hips" in self._cfg.dataset.joints:
+                joint_ids.extend([8, 11])
+            if self._cfg.dataset.joints == "all":
+                joint_ids = list(range(14))
+
+            features = features[:, :, :, joint_ids]
 
             if name == "kinematics":
                 return features
@@ -129,8 +140,9 @@ class Trainer:
         self.model.train()
         self.logger.info("Starting training...")
         # num_samples = len(self.train_dataloader)*self._cfg.hparams.batch_size - 
-        outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, self._cfg.model.in_params.num_classes)
-        labels = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size)
+        # outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, self._cfg.model.in_params.num_classes)
+        # labels = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size)
+        val_metrics = {'val_loss': np.inf, 'val_accuracy': 0.0, 'val_f1': 0.0, 'val_precision': 0.0, 'val_recall': 0.0}
         val_losses = []
         x = np.arange(0, self._cfg.hparams.early_stopping.patience)
         val_loss = np.inf
@@ -139,6 +151,8 @@ class Trainer:
         last_lr = self.optimizer.param_groups[0]['lr']
         for epoch in range(self._cfg.hparams.epochs):
             running_loss = 0.0
+            outputs = []
+            labels = []
             for i, (data) in enumerate(tqdm(self.train_dataloader)):
                 if len(data) == 3:
                     pose_sequence, target, count = data
@@ -148,10 +162,9 @@ class Trainer:
                     B, n_samples, T, J, C = pose_sequence.shape
                     pose_sequence = pose_sequence.view(B*n_samples, T, J, C)
 
-                label = torch.tensor([self.class_mapping[t] for t in target])
-                labels[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(label)] = label
-                # pose_sequence = pose_sequence.to(self.device)
-                label = label.to(self.device)
+                label = [self.class_mapping[t.item()] for t in target]
+                labels.extend(label)
+                label = torch.tensor(label, device=self.device)
 
                 assert pose_sequence.shape[0] == label.shape[0]
 
@@ -160,7 +173,7 @@ class Trainer:
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
                 output = self.model(features)
-                outputs[i*self._cfg.hparams.batch_size:i*self._cfg.hparams.batch_size+len(output)] = output.softmax(axis=1)
+                outputs.append(output.softmax(axis=1))
                 loss = self.criterion(output, label)
                 loss.backward()
                 self.optimizer.step()
@@ -177,6 +190,8 @@ class Trainer:
                         last_lr = self.optimizer.param_groups[0]['lr']
                         wandb.log({"Learning Rate": last_lr})
 
+            outputs = torch.cat(outputs, 0)
+            labels = torch.tensor(labels, device=self.device)
             train_accuracy = self.compute_accuracy(outputs, labels)
             
             self.logger.info(f"Epoch {epoch} loss: {running_loss/len(self.train_dataloader)}")
@@ -221,7 +236,7 @@ class Trainer:
         self.save_model()
 
         self.logger.info("Finished training, closing...")
-        return
+        return val_metrics
 
     def validate(self, epoch):
         self.model.eval()
@@ -236,7 +251,7 @@ class Trainer:
                 else:
                     pose_sequence, target = data
 
-                label = torch.tensor([self.class_mapping[t] for t in target])
+                label = torch.tensor([self.class_mapping[t.item()] for t in target])
                 labels[i] = label
                 # pose_sequence = pose_sequence.to(self.device)
                 label = label.to(self.device)

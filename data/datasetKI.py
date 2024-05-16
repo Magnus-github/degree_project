@@ -7,29 +7,31 @@ import time
 from tqdm import tqdm
 import random
 from sklearn.utils.class_weight import compute_class_weight
+from sklearn.model_selection import StratifiedKFold
+
+from typing import Optional
 
 
 class KIDataset(Dataset):
-    def __init__(self, data_folder: str, annotations_path: str, mode: str = "train", transform = None, seed: int = 42):
-        self.data_folder = data_folder
-        all_data = os.listdir(self.data_folder)
-        random.seed(seed)
-        train_data = random.sample(all_data, int(0.8*len(all_data)))
-        val_test_data = sorted(list(set(all_data) - set(train_data)))
-        val_data = random.sample(val_test_data, int(0.5*len(val_test_data)))
-        test_data = sorted(list(set(val_test_data) - set(val_data)))
-        self.test = False
-        if mode == "train":
-            self.data = train_data
-        if mode == "val":
-            self.data = val_data
-        if mode == "test":
-            self.data = test_data
-            self.test = True
-
+    def __init__(self, data_folder: str, annotations_path: str, num_folds: int = 10,mode: str = "train", transform: Optional[object] = None, seed: int = 42, fold: int = 0):
         self.labels = []
         self.ids = {}
-        self._get_labels_and_ids(annotations_path)
+        labels = self._get_labels_and_ids(annotations_path)
+
+        self.data_folder = data_folder
+        all_data = os.listdir(self.data_folder)
+        all_labels = [labels[self.ids[int(file.split("_")[1])]] for file in all_data]
+
+        skf = StratifiedKFold(n_splits=num_folds, random_state=seed, shuffle=True)
+        splits = list(skf.split(all_data, all_labels))
+        train_idx, val_test_idx = splits[fold]
+
+        if mode == "train":
+            self.data = [all_data[i] for i in train_idx][:5]
+            self.labels = [all_labels[i] for i in train_idx][:5]
+        if mode == "val":
+            self.data = [all_data[i] for i in val_test_idx]
+            self.labels = [all_labels[i] for i in val_test_idx]
 
         self.transform = transform
 
@@ -38,13 +40,16 @@ class KIDataset(Dataset):
         return len(self.data)
     
     def _get_labels_and_ids(self, annotations_path: str):
+        labels = []
         with open(annotations_path, 'r', encoding='utf-8-sig') as file:
             reader = csv.reader(file, delimiter=';', )
             for i,row in enumerate(reader):
                 if i == 0:
                     continue
                 self.ids[int(row[0])] = i-1
-                self.labels.append(row[1])
+                labels.append(int(row[1]))
+
+        return labels
 
     
     def __getitem__(self, idx):
@@ -54,30 +59,27 @@ class KIDataset(Dataset):
         
         pose_sequence = data
 
-        id = int(pose_file.split("_")[1])
-        label = self.labels[self.ids[id]]
+        label = self.labels[idx]
 
         if self.transform and self.transform.class_agnostic:
             pose_sequence = self.transform(pose_sequence)
         elif self.transform and not self.transform.class_agnostic:
-            if label == "1" or label == "4":
+            if label == 1 or label == 4:
                 pose_sequence = self.transform(pose_sequence)
 
-        if self.test:
-            return pose_sequence, label, id
         return pose_sequence, label
     
 
 class KIDataset_dynamicClipSample(KIDataset):
     def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/poses_smooth_np/",
                  annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
+                 num_folds: int = 10, fold: int = 0,
                  mode: str = "train", transform = None, seed: int = 42,
                  sample_rate: int = 2, clip_length: int = 720, max_overlap: int = 50):
-        super().__init__(data_folder, annotations_path, mode, transform, seed)
+        super().__init__(data_folder, annotations_path, num_folds, mode, transform, seed, fold)
         self.sample_rate = sample_rate
         self.clip_length = clip_length
         self.stride = clip_length - max_overlap
-        print(len(self.data))
 
     def __getitem__(self, idx):
         pose_file = self.data[idx]
@@ -86,60 +88,39 @@ class KIDataset_dynamicClipSample(KIDataset):
         
         pose_sequence = data
 
-        id = int(pose_file.split("_")[1])
-        label = self.labels[self.ids[id]]
+        label = self.labels[idx]
 
         if self.transform and self.transform.class_agnostic:
             pose_sequence = self.transform(pose_sequence)
         elif self.transform and not self.transform.class_agnostic:
-            if label == "1" or label == "4":
+            if label == 1 or label == 4:
                 pose_sequence = self.transform(pose_sequence)
 
         n_frames = pose_sequence.shape[0]
 
-        pose_clips = []
+        # pose_clips = []
 
-        if (n_frames - self.clip_length) / self.stride < 1: # If we can't take at least one stride (i.e. two clips) from the sequence
-            self.sample_rate = 1
+        # if (n_frames - self.clip_length) / self.stride < 1: # If we can't take at least one stride (i.e. two clips) from the sequence
+        #     self.sample_rate = 1
 
-        if n_frames < self.clip_length: # If the sequence is shorter than the clip length
-            pose_sequence = np.concatenate([pose_sequence, np.zeros((self.clip_length - n_frames, pose_sequence.shape[1], pose_sequence.shape[2]))], axis=0)
-            pose_clips.append(pose_sequence)
-        elif n_frames > self.clip_length:
-            sample_pool = list(range(0, n_frames - self.clip_length, self.stride))
-            for i in range(self.sample_rate):
-                start = random.choice(sample_pool)
-                pose_clips.append(pose_sequence[start:start+self.clip_length])
-                sample_pool.remove(start)
+        # if n_frames < self.clip_length: # If the sequence is shorter than the clip length
+        #     pose_sequence = np.concatenate([pose_sequence, np.zeros((self.clip_length - n_frames, pose_sequence.shape[1], pose_sequence.shape[2]))], axis=0)
+        #     pose_clips.append(pose_sequence)
+        # elif n_frames > self.clip_length:
+        #     sample_pool = list(range(0, n_frames - self.clip_length, self.stride))
+        #     for i in range(self.sample_rate):
+        #         start = random.choice(sample_pool)
+        #         pose_clips.append(pose_sequence[start:start+self.clip_length])
+        #         sample_pool.remove(start)
 
-        pose_clips = np.array(pose_clips)
+        # pose_clips = np.array(pose_clips)
+        
+        assert n_frames >= self.clip_length, f"Clip length {self.clip_length} is longer than sequence length {n_frames}."
+        pose_clips = torch.tensor(pose_sequence).unfold(0, self.clip_length, self.stride).permute(0, 3, 1, 2).contiguous()
 
-        # ratio = self.clip_length / n_frames
+        label = torch.tensor([label]*pose_clips.shape[0])
 
         return pose_clips, label
-    
-
-class KIDataset_clips(KIDataset):
-    def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/clips_smooth_np/",
-                 annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
-                 mode: str = "train", seed: int = 42):
-        super().__init__(data_folder, annotations_path, mode, seed)
-
-    def __getitem__(self, idx):
-        pose_file = self.data[idx]
-        with open(os.path.join(self.data_folder, pose_file), 'rb') as file:
-            data = np.load(file)
-        
-        pose_sequence = data
-
-        count = 0
-        for  file in os.listdir(self.data_folder):
-            if "_".join(pose_file.split("_")[:-1]) in file:
-                count += 1
-
-        id = int(pose_file.split("_")[1])
-        label = self.labels[self.ids[id]]
-        return pose_sequence, label, count
 
 
 def collate_fn(batch):

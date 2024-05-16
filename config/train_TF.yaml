@@ -13,7 +13,7 @@ model:
         clip_len: 360
         num_classes: 2
         dropout: 0.6
-        pool_method: scripts.FM_classification.model_utils:MaxPool
+        pool_method: scripts.FM_classification.model_utils:AvgPool
     save_period: 0.1
 dataset:
     name: data.datasetKI:KIDataset_dynamicClipSample
@@ -25,15 +25,18 @@ dataset:
             p: 0.9 # [0, 1]
             class_agnostic: false
     fps: 25
-    mapping: {'1': 0, '4': 0, '12': 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
+    diff_step: 1
+    joints: "hands_and_feet" # options: [hands, feet, hips, hands_and_feet, hands_feet_hips, all] 
+    mapping: {1: 0, 4: 0, 12: 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
     sampling: 
-        enable: true
+        enable: false
         method: oversampling # options: [oversampling, undersampling]
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
-        # data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
-        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
-        # annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
+        # data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
+        data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
+        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
+        num_folds: 10
     params_clips:
         sample_rate: 1
         clip_length: 720
@@ -91,11 +94,11 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    path: /local_storage/users/tibbe/models/FM/TimeFormer/
-    # path: /Volumes/USB3/thesis/models/FM/TimeFormer/
+    # path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    path: /Volumes/USB3/thesis/models/FM/TimeFormer/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth

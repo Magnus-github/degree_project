@@ -146,8 +146,9 @@ class LearnablePositionalEncoding(nn.Module):
 class TimeFormer(torch.nn.Module):
     def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_encoder_layers=2, num_heads=4, num_joints=18, clip_len=240, num_classes=3, dropout=0.4, pool_method: str = None):
         super(TimeFormer, self).__init__()
-        self.cnn = nn.Conv1d(joint_in_channels, joint_hidden_channels, num_joints)
+        # self.cnn = nn.Conv1d(joint_in_channels, joint_hidden_channels, num_joints)
         # self.norm = nn.BatchNorm1d(joint_hidden_channels)
+        joint_hidden_channels = joint_in_channels*num_joints
         self.pe = LearnablePositionalEncoding(joint_hidden_channels, clip_len)
         encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=num_heads, dim_feedforward=4*joint_hidden_channels, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
@@ -195,7 +196,8 @@ class TimeFormer(torch.nn.Module):
 
         clip_cls = self.mlp(x)
 
-        pool = nn.MaxPool1d(K)
+        # pool = nn.MaxPool1d(K)
+        pool = str_to_class(self.pool_method)(K)
         vid_cls = clip_cls.view(B, K, -1).permute(0, 2, 1)
         vid_cls = pool(vid_cls).squeeze(dim=-1)
 
