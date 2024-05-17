@@ -173,10 +173,14 @@ class TimeFormer(torch.nn.Module):
         B, T, c, j = x.shape
         # split the sequence into subsequences of length t
         t = self.clip_len
-        x = x[:, T%t:] # cut the sequence to be divisible by t
-        K = T//t
-        x = x.view(B, K, t, c, j)
+        stride = t
+        x = x.unfold(1, t, stride).permute(0,1,4,2,3) # [B, K, t, c, j]
+        # x = x[:, T%t:] # cut the sequence to be divisible by t
+        # K = T//t
+        # x = x.view(B, K, t, c, j)
+        B, K, t, c, j = x.shape
         x = x.reshape(B*K,t,c*j)
+
 
         # embed the joint dimension with CNN layer 
         # x = self.cnn(x)

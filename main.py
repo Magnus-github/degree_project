@@ -1,9 +1,12 @@
 import wandb
 from omegaconf import OmegaConf
-from omegaconf.dictconfig import DictConfig
+from omegaconf import DictConfig
 import argparse
 import logging
 import coloredlogs
+import json
+import os
+import numpy as np
 
 from data.dataloaders import get_dataloaders, get_dataloaders_clips
 from scripts.FM_classification.trainer import Trainer
@@ -13,7 +16,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)s] [%(levelname)s] %(message)s")
 
-def train_and_eval(cfg: DictConfig, fold: int = 0):
+
+def train_and_eval(cfg: DictConfig, fold: int = 0, project_name: str = "FM_classification"):
     if cfg.test.enable:
         cfg.logger.enable = False
 
@@ -32,7 +36,7 @@ def train_and_eval(cfg: DictConfig, fold: int = 0):
             suffix = "STTransformer"
         else:
             raise ValueError("Unknown model name.")
-        run = wandb.init(project=f'FM-classification_2Class_{suffix}', config=dict(cfg), entity="m46nu5")
+        run = wandb.init(project=f'{project_name}_{suffix}', config=dict(cfg), entity="m46nu5")
     else:
         cfg.hparams.epochs = 25
         cfg.hparams.validation_period = 1
@@ -61,17 +65,29 @@ def train_and_eval(cfg: DictConfig, fold: int = 0):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/train_TF.yaml")
+    parser.add_argument("--config", type=str, default="config/train_TF.yaml", help="Path to config file.")
+    parser.add_argument("--project", type=str, default="FM_classification", help="Wandb project name.")
     args = parser.parse_args()
     cfg = OmegaConf.load(args.config)
     logger.info(cfg)
 
-    folds = range(10)
+    folds = range(cfg.dataset.params.num_folds)
     all_metrics = {f"fold_{fold}": {} for fold in folds}
-    for fold in range(cfg.dataset.params.num_folds):
-        metrics_fold = train_and_eval(cfg, fold=fold)
+    for fold in folds:
+        metrics_fold = train_and_eval(cfg, fold=fold, project_name=args.project)
         all_metrics[f"fold_{fold}"] = metrics_fold
-    
+
+    logger.info(all_metrics)
+
+    # save metrics
+    save_dir = "output/" + args.project
+    os.makedirs(save_dir, exist_ok=True)
+    np.save(os.path.join(save_dir, "metrics.npy"), all_metrics, allow_pickle=True)
+
+    # load with: np.load(os.path.join(save_dir, "metrics.npy"), allow_pickle=True).item()
+
+
+
     # magnitude = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     # probs = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 

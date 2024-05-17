@@ -27,8 +27,8 @@ class KIDataset(Dataset):
         train_idx, val_test_idx = splits[fold]
 
         if mode == "train":
-            self.data = [all_data[i] for i in train_idx][:5]
-            self.labels = [all_labels[i] for i in train_idx][:5]
+            self.data = [all_data[i] for i in train_idx]
+            self.labels = [all_labels[i] for i in train_idx]
         if mode == "val":
             self.data = [all_data[i] for i in val_test_idx]
             self.labels = [all_labels[i] for i in val_test_idx]

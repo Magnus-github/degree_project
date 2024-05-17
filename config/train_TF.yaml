@@ -5,7 +5,7 @@ model:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
-        joint_in_channels: 4
+        joint_in_channels: 2
         joint_hidden_channels: 16
         num_encoder_layers: 1
         num_heads: 2
@@ -23,26 +23,27 @@ dataset:
         params:
             magnitude: 0.5 # [0, 1]
             p: 0.9 # [0, 1]
-            class_agnostic: false
+            class_agnostic: true
     fps: 25
     diff_step: 1
-    joints: "hands_and_feet" # options: [hands, feet, hips, hands_and_feet, hands_feet_hips, all] 
+    class_names: ['FM-', 'FM_abnormal', 'FM+']
+    joints: hands_and_feet # options: [hands, feet, hips, hands_and_feet, hands_feet_hips, all] 
     mapping: {1: 0, 4: 0, 12: 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
     sampling: 
-        enable: false
+        enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        # data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
-        data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
-        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
-        annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
+        data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
+        # data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
+        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        # annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
         num_folds: 10
     params_clips:
         sample_rate: 1
         clip_length: 720
         max_overlap: 50
 hparams:
-    epochs: 1000
+    epochs: 400
     batch_size: 24
     validation_period: 1
     early_stopping:
@@ -55,7 +56,7 @@ hparams:
     criterion: 
         name: scripts.FM_classification.loss:CrossEntropyLoss
         params: # only used for WeightedCrossEntropyLoss
-            weights: [2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
+            weights: [2.5, 0.5] #[2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
     optimizer:
         name: scripts.FM_classification.optimizer:AdamW
         use_scheduler: true
@@ -69,12 +70,12 @@ hparams:
     scheduler:
         name: scripts.FM_classification.optimizer:CosineDecayWithWarmUpScheduler
         params:
-            step_per_epoch: 5
+            step_per_epoch: 6
             init_warmup_lr: 0.0005
-            warm_up_steps: 200 # 20 epochs
+            warm_up_steps: 300 # 20 epochs
             max_lr: 0.001
             min_lr: 0.0005
-            num_step_down: 500 # 300 epochs
+            num_step_down: 2100 # 300 epochs
             num_step_up: 0 # None (empty is none)
             T_mul: 1
             max_lr_decay: Exp
@@ -94,11 +95,11 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: false
+    enable: true
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    # path: /local_storage/users/tibbe/models/FM/TimeFormer/
-    path: /Volumes/USB3/thesis/models/FM/TimeFormer/
+    path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    # path: /Volumes/USB3/thesis/models/FM/TimeFormer/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth

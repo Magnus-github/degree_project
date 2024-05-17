@@ -16,6 +16,8 @@ from scripts.utils.str_to_class import str_to_class
 from data.dataloaders import get_dataloaders, get_dataloaders_clips
 from scripts.utils.check_debugger import debugger_is_active
 
+from sklearn.metrics import confusion_matrix, f1_score
+
 
 class Trainer:
     def __init__(self, cfg, dataloaders, run_id=None):
@@ -45,6 +47,10 @@ class Trainer:
         self.train_dataloader = dataloaders['train']
         self.val_dataloader = dataloaders['val']
         # self.test_dataloader = dataloaders['test']
+        if len(set(self._cfg.dataset.mapping.values())) == 3:
+            self.class_names = self._cfg.dataset.class_names
+        elif len(set(self._cfg.dataset.mapping.values())) == 2:
+            self.class_names = self._cfg.dataset.class_names[::len(self._cfg.dataset.class_names)-1]
         self.criterion = str_to_class(cfg.hparams.criterion.name)(**cfg.hparams.criterion.params, device=self.device)
         self.optimizer = str_to_class(cfg.hparams.optimizer.name)(self.model.parameters(), **cfg.hparams.optimizer.params)
         if "Adam" in cfg.hparams.optimizer.name and cfg.hparams.optimizer.use_scheduler is False:
@@ -55,6 +61,15 @@ class Trainer:
         if not debugger_is_active() and cfg.logger.enable:
             wandb.watch(self.model)
         self.class_mapping = cfg.dataset.mapping
+        self.val_metrics = {'best': {'val_accuracy': 0,
+                                'val_loss': np.inf,
+                                'val_f1': np.zeros(self._cfg.model.in_params.num_classes),
+                                'confusion_matrix': None,},
+                       'final': {'val_accuracy': 0,
+                                 'val_loss': np.inf,
+                                 'val_f1': np.zeros(self._cfg.model.in_params.num_classes),
+                                 'confusion_matrix': None,}
+                        }
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def create_features(self, pose_sequence, name):
@@ -142,7 +157,6 @@ class Trainer:
         # num_samples = len(self.train_dataloader)*self._cfg.hparams.batch_size - 
         # outputs = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size, self._cfg.model.in_params.num_classes)
         # labels = torch.zeros(len(self.train_dataloader)*self._cfg.hparams.batch_size)
-        val_metrics = {'val_loss': np.inf, 'val_accuracy': 0.0, 'val_f1': 0.0, 'val_precision': 0.0, 'val_recall': 0.0}
         val_losses = []
         x = np.arange(0, self._cfg.hparams.early_stopping.patience)
         val_loss = np.inf
@@ -201,7 +215,7 @@ class Trainer:
                        "Train Accuracy": train_accuracy})
 
             if (epoch+1) % self._cfg.hparams.validation_period == 0 or epoch == 0:
-                val_loss = self.validate(epoch)
+                val_loss, cur_val_metrics = self.validate(epoch)
 
                 val_losses.append(val_loss)
                 if len(val_losses) > self._cfg.hparams.early_stopping.patience:
@@ -214,10 +228,14 @@ class Trainer:
                             self.logger.info(f"Early stopping at epoch {epoch}.")
                             self.save_model(epoch=epoch)
                             break
+                    
 
                     if val_loss < best_val_loss and val_loss < self._cfg.hparams.save_best_threshold:
                         best_val_loss = val_loss
                         self.save_model(best=True)
+
+                if val_loss < self.val_metrics['best']['val_loss']:
+                    self.update_val_metrics(cur_val_metrics)
 
             # if self.scheduler:
             #     if "ReduceLROnPlateau" in self._cfg.hparams.scheduler.name:
@@ -233,10 +251,11 @@ class Trainer:
             
             running_loss = 0.0
 
-        self.save_model()
+        self.save_model() 
+        self.update_val_metrics(cur_val_metrics, final=True)
 
         self.logger.info("Finished training, closing...")
-        return val_metrics
+        return self.val_metrics
 
     def validate(self, epoch):
         self.model.eval()
@@ -267,8 +286,11 @@ class Trainer:
                 # correct += (predicted == label).sum().item()
 
         accuracy = self.compute_accuracy(outputs, labels)
+        loss = running_val_loss/len(self.val_dataloader)
+        confusion_matrix = self.compute_confusion_matrix(outputs, labels)
+        f1_scores = f1_score(labels.cpu(), torch.argmax(outputs, 1).cpu(), average=None)
         self.logger.info(f"Accuracy of the network on the {len(self.val_dataloader)} test sequences: {100*accuracy}%")
-        self.logger.info(f"Validation loss: {running_val_loss/len(self.val_dataloader)}")
+        self.logger.info(f"Validation loss: {loss}")
         # write output to file
         if epoch == 0:
             f = open(os.path.join(self.output_dir, "validation_outputs.txt"), "w")
@@ -278,12 +300,20 @@ class Trainer:
         f.close()
 
         if not debugger_is_active() and self._cfg.logger.enable:
+            preds = [pred.item() for pred in outputs.argmax(dim=1)]
+            y_true = [int(l.item()) for l in labels]
             wandb.log({"val_accuracy": accuracy,
-                   "val_loss": running_val_loss/len(self.val_dataloader)})
+                   "val_loss": loss,
+                   "val_conf_mat": wandb.plot.confusion_matrix(probs=None,
+                        y_true=y_true, preds=preds,
+                        class_names=self.class_names)})
         
         self.model.train()
-
-        return running_val_loss/len(self.val_dataloader)
+        metrics = {'val_loss': loss,
+                   'val_accuracy': accuracy,
+                   'confusion_matrix': confusion_matrix,
+                   'val_f1': f1_scores}
+        return loss, metrics
     
     def test(self):
         self.model.eval()
@@ -308,7 +338,7 @@ class Trainer:
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
                 print(id)
-                # if i == 0:^
+                # if i == 0:
                 output = self.model(features)
                 print(output)
                 outputs[i] = output.softmax(axis=1)
@@ -327,6 +357,21 @@ class Trainer:
         total = labels.size(0)
         correct = (predicted == labels).sum().item()
         return correct / total
+    
+    def compute_confusion_matrix(self, outputs, labels):
+        _, predicted = torch.max(outputs, 1)
+        possible_labels = np.unique(labels.cpu().numpy())
+        return confusion_matrix(labels, predicted, labels=possible_labels)
+    
+    def update_val_metrics(self, metrics: dict[float, float, np.ndarray, np.ndarray], final: bool = False):
+        if final:
+            name = 'final'
+        else:
+            name = 'best'
+        self.val_metrics[name]['val_loss'] = metrics['val_loss']
+        self.val_metrics[name]['val_accuracy'] = metrics['val_accuracy']
+        self.val_metrics[name]['confusion_matrix'] = metrics['confusion_matrix']
+        self.val_metrics[name]['val_f1'] = metrics['val_f1']
 
     def save_model(self, epoch=None, best=False):
         path = os.path.join(self.output_dir, "model")
