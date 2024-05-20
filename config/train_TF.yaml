@@ -5,7 +5,7 @@ model:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
-        joint_in_channels: 2
+        joint_in_channels: 4
         joint_hidden_channels: 16
         num_encoder_layers: 1
         num_heads: 2

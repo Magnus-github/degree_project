@@ -32,6 +32,9 @@ class KIDataset(Dataset):
         if mode == "val":
             self.data = [all_data[i] for i in val_test_idx]
             self.labels = [all_labels[i] for i in val_test_idx]
+        if mode == "all":
+            self.data = all_data
+            self.labels = all_labels
 
         self.transform = transform
 
