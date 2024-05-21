@@ -32,8 +32,14 @@ def train_and_eval(cfg: DictConfig, fold: int = 0, project_name: str = "FM_class
     elif cfg.logger.enable:
         if "TimeFormer" in cfg.model.name:
             suffix = "TimeFormer"
+            if "GCN" in cfg.model.name:
+                suffix += "_GCN"
         elif "STTransformer" in cfg.model.name:
             suffix = "STTransformer"
+        elif "SMNN" in cfg.model.name:
+            suffix = "SMNN"
+        elif "TimeConvNet" in cfg.model.name:
+            suffix = "TimeConvNet"    
         else:
             raise ValueError("Unknown model name.")
         run = wandb.init(project=f'{project_name}_{suffix}', config=dict(cfg), entity="m46nu5")
