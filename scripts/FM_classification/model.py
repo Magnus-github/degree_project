@@ -145,7 +145,7 @@ class LearnablePositionalEncoding(nn.Module):
 
 
 class TimeFormer(torch.nn.Module):
-    def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_encoder_layers=2, num_heads=4, num_joints=18, clip_len=240, num_classes=3, dropout=0.4, pool_method: str = None):
+    def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_encoder_layers=2, num_heads=4, num_joints=18, clip_len=240, clip_overlap=0, num_classes=3, dropout=0.4, pool_method: str = None):
         super(TimeFormer, self).__init__()
         # self.cnn = nn.Conv1d(joint_in_channels, joint_hidden_channels, num_joints)
         # self.norm = nn.BatchNorm1d(joint_hidden_channels)
@@ -169,13 +169,13 @@ class TimeFormer(torch.nn.Module):
         )
         self.pool_method = pool_method
         self.clip_len = clip_len
+        self.stride = clip_len - clip_overlap
 
     def forward(self, x, **kwargs):
         B, T, c, j = x.shape
         # split the sequence into subsequences of length t
         t = self.clip_len
-        stride = t
-        x = x.unfold(1, t, stride).permute(0,1,4,2,3) # [B, K, t, c, j]
+        x = x.unfold(1, t, self.stride).permute(0,1,4,2,3) # [B, K, t, c, j]
         # x = x[:, T%t:] # cut the sequence to be divisible by t
         # K = T//t
         # x = x.view(B, K, t, c, j)

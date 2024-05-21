@@ -1,16 +1,17 @@
 model:
     name: scripts.FM_classification.model:TimeFormer
-    in_features: kinematics_vel # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
+    in_features: kinematics_pos # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
     load_weights:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
-        joint_in_channels: 4
+        joint_in_channels: 2
         joint_hidden_channels: 16
         num_encoder_layers: 1
         num_heads: 2
-        num_joints: 4 # options: [14, 18]
+        num_joints: 14 # options: [14, 18]
         clip_len: 360
+        clip_overlap: 180
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:AvgPool
@@ -18,7 +19,7 @@ model:
 dataset:
     name: data.datasetKI:KIDataset_dynamicClipSample
     transform:
-        enable: true
+        enable: false
         name: data.augmentations:RandScale
         params:
             magnitude: 0.5 # [0, 1]
@@ -27,7 +28,7 @@ dataset:
     fps: 25
     diff_step: 1
     class_names: ['FM-', 'FM_abnormal', 'FM+']
-    joints: hands_and_feet # options: [hands, feet, hips, hands_and_feet, hands_feet_hips, all] 
+    joints: all # options: [hands, feet, hips, hands_and_feet, hands_feet_hips, all] 
     mapping: {1: 0, 4: 0, 12: 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
     sampling: 
         enable: true
