@@ -206,6 +206,43 @@ class TimeFormer(torch.nn.Module):
         vid_cls = pool(vid_cls).squeeze(dim=-1)
 
         return vid_cls
+    
+
+
+class SMNN(torch.nn.Module):
+    def __init__(self, joint_in_channels: int = 4,
+                 joint_hidden_channels: int = 50,
+                 num_joints: int = 14,
+                 clip_len: int = 360,
+                 clip_overlap: int = 180,
+                 num_classes: int = 2,
+                 dropout: float = 0.2) -> None:
+        super().__init__()
+
+        in_channels = joint_in_channels * num_joints
+        self.fc = nn.Linear(in_channels, joint_hidden_channels)
+        self.dropout = nn.Dropout(dropout)
+        self.fc2 = nn.Linear(joint_hidden_channels, 2*joint_hidden_channels)
+        self.fc3 = nn.Linear(2*joint_hidden_channels, num_classes)
+
+        self.clip_len = clip_len
+        self.stride = clip_len - clip_overlap
+
+    def forward(self, x):
+        t = self.clip_len
+        stride = t
+        x = x.unfold(1, t, stride).permute(0,1,4,2,3)
+        B, K, t, c, j = x.shape
+        x = x.reshape(B*K,t,c*j)
+
+        x = self.fc(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = F.prelu(x)
+        pred = self.fc3(x)
+
+        return pred
 
 
 if __name__ == "__main__":

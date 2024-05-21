@@ -5,3 +5,4 @@ wandb/
 *logs/
 *venv*/
 *.png
+*.pdf
