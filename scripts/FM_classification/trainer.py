@@ -56,6 +56,9 @@ class Trainer:
         if "Adam" in cfg.hparams.optimizer.name and cfg.hparams.optimizer.use_scheduler is False:
             self.scheduler = None
         else:
+            cfg.hparams.scheduler.params.steps_per_epoch = len(self.train_dataloader)
+            cfg.hparams.scheduler.params.warmup_steps = 50*cfg.hparams.scheduler.params.steps_per_epoch
+            cfg.hparams.scheduler.params.num_steps_down = 350*cfg.hparams.scheduler.params.steps_per_epoch
             self.scheduler = str_to_class(cfg.hparams.scheduler.name)(self.optimizer, **cfg.hparams.scheduler.params)
         self.model.to(self.device)
         if not debugger_is_active() and cfg.logger.enable:
