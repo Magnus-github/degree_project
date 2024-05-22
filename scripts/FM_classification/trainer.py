@@ -13,7 +13,7 @@ import sys
 sys.path.append(os.curdir)
 
 from scripts.utils.str_to_class import str_to_class
-from data.dataloaders import get_dataloaders, get_dataloaders_clips
+from data.dataloaders import get_dataloaders, get_edge_indices_14
 from scripts.utils.check_debugger import debugger_is_active
 
 from sklearn.metrics import confusion_matrix, f1_score
@@ -37,6 +37,7 @@ class Trainer:
             self._cfg.model.in_params.joint_in_channels = 4
         elif cfg.model.in_features == "kinematics_acc":
             self._cfg.model.in_params.joint_in_channels = 6
+        self.edge_indices = get_edge_indices_14().to(self.device)
         self.model = str_to_class(cfg.model.name)(**cfg.model.in_params)
         if cfg.model.load_weights.enable:
             if cfg.test.enable:
@@ -192,7 +193,7 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
-                output = self.model(features)
+                output = self.model(features, edges=self.edge_indices)
                 outputs.append(output.softmax(axis=1))
                 loss = self.criterion(output, label)
                 loss.backward()
@@ -286,7 +287,7 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
-                output = self.model(features)
+                output = self.model(features, edges=self.edge_indices)
                 outputs[i] = output.softmax(axis=1)
                 val_loss = self.criterion(output, label)
                 running_val_loss += val_loss.item()
@@ -342,7 +343,7 @@ class Trainer:
 
                 features = self.create_features(pose_sequence, self._cfg.model.in_features)
                 features = features.to(self.device)
-                output = self.model(features)
+                output = self.model(features, edges=self.edge_indices)
                 outputs[i] = output.softmax(axis=1)
 
         accuracy = self.compute_accuracy(outputs, labels)

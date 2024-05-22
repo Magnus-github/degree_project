@@ -80,10 +80,10 @@ if __name__ == "__main__":
     folds = range(cfg.dataset.params.num_folds)
     all_metrics = {}
     for test_fold in folds:
-        all_metrics[f"fold_{test_fold}"] = {}
+        all_metrics[f"test_fold_{test_fold}"] = {}
         for val_fold in folds[:-1]:
             metrics_fold = train_and_eval(cfg, test_fold=test_fold, val_fold=val_fold, project_name=args.project)
-            all_metrics[f"fold_{test_fold}"][f"fold_{val_fold}"] = metrics_fold
+            all_metrics[f"test_fold_{test_fold}"][f"val_fold_{val_fold}"] = metrics_fold
 
             print(all_metrics)
 
