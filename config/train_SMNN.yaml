@@ -39,8 +39,8 @@ dataset:
         num_folds: 10
     params_clips:
         sample_rate: 1
-        clip_length: 720
-        max_overlap: 240
+        clip_length: 750
+        max_overlap: 250
 hparams:
     epochs: 400
     batch_size: 24

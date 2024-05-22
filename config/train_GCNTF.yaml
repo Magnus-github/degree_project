@@ -5,12 +5,13 @@ model:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
     in_params:
-        joint_in_channels: 7
+        joint_in_channels: 4
         joint_hidden_channels: 64
         num_encoder_layers: 2
         num_heads: 4
-        num_joints: 18
-        clip_len: 240
+        num_joints: 14
+        clip_len: 250
+        clip_overlap: 125
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:AvgPool
@@ -27,7 +28,7 @@ dataset:
     fps: 25
     diff_step: 1
     class_names: ['FM-', 'FM_abnormal', 'FM+']
-    joints: hands_and_feet # options: [hands, feet, hips, hands_and_feet, hands_feet_hips, all] 
+    joints: all # options: [hands, feet, hips, hands_and_feet, hands_feet_hips, all] 
     mapping: {1: 0, 4: 0, 12: 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
     sampling: 
         enable: true
@@ -40,11 +41,11 @@ dataset:
         num_folds: 10
     params_clips:
         sample_rate: 1
-        clip_length: 720
-        max_overlap: 240
+        clip_length: 750
+        max_overlap: 250
 hparams:
     epochs: 400
-    batch_size: 24
+    batch_size: 8
     validation_period: 1
     early_stopping:
         enable: false
@@ -95,7 +96,7 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
     # path: /local_storage/users/tibbe/models/FM/TimeFormer/

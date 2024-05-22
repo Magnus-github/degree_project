@@ -8,9 +8,9 @@ model:
         joint_in_channels: 4
         joint_hidden_channels: 16
         num_joints: 4 # options: [14, 18]
-        kernel_size: 120
+        kernel_size: 125
         rel_stride: 0.5
-        clip_len: 360
+        clip_len: 375
         clip_overlap: 180
         num_classes: 2
         dropout: 0.6
@@ -40,8 +40,8 @@ dataset:
         num_folds: 8
     params_clips:
         sample_rate: 1
-        clip_length: 720
-        max_overlap: 240
+        clip_length: 750
+        max_overlap: 250
 hparams:
     epochs: 400
     batch_size: 24

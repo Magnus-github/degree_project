@@ -71,7 +71,7 @@ def train_and_eval(cfg: DictConfig, test_fold: int = 0, val_fold: int = 0, proje
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/train_TF.yaml", help="Path to config file.")
+    parser.add_argument("--config", type=str, default="config/train_GCNTF.yaml", help="Path to config file.")
     parser.add_argument("--project", type=str, default="FM_classification", help="Wandb project name.")
     args = parser.parse_args()
     cfg = OmegaConf.load(args.config)
@@ -84,8 +84,6 @@ if __name__ == "__main__":
         for val_fold in folds[:-1]:
             metrics_fold = train_and_eval(cfg, test_fold=test_fold, val_fold=val_fold, project_name=args.project)
             all_metrics[f"test_fold_{test_fold}"][f"val_fold_{val_fold}"] = metrics_fold
-
-            print(all_metrics)
 
     logger.info(all_metrics)
 

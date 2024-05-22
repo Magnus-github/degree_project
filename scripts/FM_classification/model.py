@@ -212,19 +212,17 @@ class TimeFormer(torch.nn.Module):
 import torch_geometric.nn as gnn
 
 class GCN_TimeFormer(nn.Module):
-    def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_encoder_layers=2, num_heads=4, num_joints=18, clip_len=240, num_classes=3, dropout=0.4, pool_method: str = None):
+    def __init__(self, joint_in_channels=7, joint_hidden_channels=64, num_encoder_layers=2, num_heads=4, num_joints=18, clip_len=240, clip_overlap=80, num_classes=3, dropout=0.4, pool_method: str = None):
         super(GCN_TimeFormer, self).__init__()
 
         self.gcn = gnn.GCNConv(joint_in_channels, joint_hidden_channels)
+        hidden_dim_mlp = joint_hidden_channels
         joint_hidden_channels = joint_hidden_channels*num_joints
         self.pe = LearnablePositionalEncoding(joint_hidden_channels, clip_len)
         encoder_layer = nn.TransformerEncoderLayer(d_model=joint_hidden_channels, nhead=num_heads, dim_feedforward=4*joint_hidden_channels, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
         self.attention = Attention(joint_hidden_channels, joint_hidden_channels)
         self.dropout = nn.Dropout(dropout)
-        hidden_dim_mlp = 64#8*joint_hidden_channels
-        if hidden_dim_mlp < 64:
-            hidden_dim_mlp = 64
         self.mlp = nn.Sequential(
             nn.Linear(joint_hidden_channels, hidden_dim_mlp),
             nn.ReLU(),
@@ -236,15 +234,13 @@ class GCN_TimeFormer(nn.Module):
         )
         self.pool_method = pool_method
         self.clip_len = clip_len
+        self.stride = clip_len - clip_overlap
 
     def forward(self, x, **kwargs):
         edges = kwargs["edges"]
-        B, T, c, j = x.shape
-        # split the sequence into subsequences of length t
         t = self.clip_len
-        x = x[:, T%t:]
-        K = T//t
-        x = x.view(B, K, t, c, j)
+        x = x.unfold(1, t, self.stride).permute(0,1,4,2,3)
+        B, K, t, c, j = x.shape
         x = x.reshape(B*K*t,c,j)
         x = x.permute(0, 2, 1)
 
@@ -295,8 +291,7 @@ class SMNN(torch.nn.Module):
 
     def forward(self, x, **kwargs):
         t = self.clip_len
-        stride = t
-        x = x.unfold(1, t, stride).permute(0,1,4,2,3)
+        x = x.unfold(1, t, self.stride).permute(0,1,4,2,3)
         B, K, t, c, j = x.shape
         x = x.reshape(B*K,t*c*j)
 
@@ -342,8 +337,7 @@ class TimeConvNet(nn.Module):
 
     def forward(self, x, **kwargs):
         t = self.clip_len
-        stride = t
-        x = x.unfold(1, t, stride).permute(0,1,4,2,3)
+        x = x.unfold(1, t, self.stride).permute(0,1,4,2,3)
         B, K, t, c, j = x.shape
         x = x.reshape(B*K,t,c*j).permute(0,2,1)
 
