@@ -13,7 +13,7 @@ from typing import Optional
 
 
 class KIDataset(Dataset):
-    def __init__(self, data_folder: str, annotations_path: str, num_folds: int = 10,mode: str = "train", transform: Optional[object] = None, seed: int = 42, fold: int = 0):
+    def __init__(self, data_folder: str, annotations_path: str, num_folds: int = 10,mode: str = "train", transform: Optional[object] = None, seed: int = 42, test_fold: int = 0, val_fold: int = 0):
         self.labels = []
         self.ids = {}
         labels = self._get_labels_and_ids(annotations_path)
@@ -22,16 +22,27 @@ class KIDataset(Dataset):
         all_data = os.listdir(self.data_folder)
         all_labels = [labels[self.ids[int(file.split("_")[1])]] for file in all_data]
 
+        # Split data into train/val and test
         skf = StratifiedKFold(n_splits=num_folds, random_state=seed, shuffle=True)
         splits = list(skf.split(all_data, all_labels))
-        train_idx, val_test_idx = splits[fold]
+        train_val_idx, test_idx = splits[test_fold]
+
+        # Split train/val into train and val
+        skf_2 = StratifiedKFold(n_splits=num_folds-1, random_state=seed, shuffle=True)
+        train_val_data = [all_data[i] for i in train_val_idx]
+        train_val_labels = [all_labels[i] for i in train_val_idx]
+        splits_2 = list(skf_2.split(train_val_data, train_val_labels))
+        train_idx, val_idx = splits_2[val_fold]
 
         if mode == "train":
             self.data = [all_data[i] for i in train_idx]
             self.labels = [all_labels[i] for i in train_idx]
         if mode == "val":
-            self.data = [all_data[i] for i in val_test_idx]
-            self.labels = [all_labels[i] for i in val_test_idx]
+            self.data = [all_data[i] for i in val_idx]
+            self.labels = [all_labels[i] for i in val_idx]
+        if mode == "test":
+            self.data = [all_data[i] for i in test_idx]
+            self.labels = [all_labels[i] for i in test_idx]
         if mode == "all":
             self.data = all_data
             self.labels = all_labels
@@ -76,10 +87,10 @@ class KIDataset(Dataset):
 class KIDataset_dynamicClipSample(KIDataset):
     def __init__(self, data_folder: str="/Midgard/Data/tibbe/datasets/own/poses_smooth_np/",
                  annotations_path: str="/Midgard/Data/tibbe/datasets/own/annotations.csv",
-                 num_folds: int = 10, fold: int = 0,
+                 num_folds: int = 10, test_fold: int = 0, val_fold: int = 0,
                  mode: str = "train", transform = None, seed: int = 42,
                  sample_rate: int = 2, clip_length: int = 720, max_overlap: int = 50):
-        super().__init__(data_folder, annotations_path, num_folds, mode, transform, seed, fold)
+        super().__init__(data_folder, annotations_path, num_folds, mode, transform, seed, test_fold, val_fold)
         self.sample_rate = sample_rate
         self.clip_length = clip_length
         self.stride = clip_length - max_overlap

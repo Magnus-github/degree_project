@@ -17,14 +17,14 @@ logger.setLevel(logging.INFO)
 coloredlogs.install(level=logging.INFO, fmt="[%(asctime)s] [%(name)s] [%(module)s] [%(levelname)s] %(message)s")
 
 
-def train_and_eval(cfg: DictConfig, fold: int = 0, project_name: str = "FM_classification"):
+def train_and_eval(cfg: DictConfig, test_fold: int = 0, val_fold: int = 0, project_name: str = "FM_classification"):
     if cfg.test.enable:
         cfg.logger.enable = False
 
     if "dynamicClipSample" in cfg.dataset.name:
-        dataloaders = get_dataloaders_clips(cfg, fold=fold)
+        dataloaders = get_dataloaders_clips(cfg, test_fold=test_fold, val_fold=val_fold)
     else:
-        dataloaders = get_dataloaders(cfg, fold=fold)
+        dataloaders = get_dataloaders(cfg, test_fold=test_fold, val_fold=val_fold)
 
     if debugger_is_active():
         cfg.hparams.epochs = 1
@@ -44,7 +44,7 @@ def train_and_eval(cfg: DictConfig, fold: int = 0, project_name: str = "FM_class
             raise ValueError("Unknown model name.")
         run = wandb.init(project=f'{project_name}_{suffix}', config=dict(cfg), entity="m46nu5")
     else:
-        cfg.hparams.epochs = 25
+        cfg.hparams.epochs = 2
         cfg.hparams.validation_period = 1
 
     run_id = run.name if cfg.logger.enable else None
@@ -78,10 +78,14 @@ if __name__ == "__main__":
     logger.info(cfg)
 
     folds = range(cfg.dataset.params.num_folds)
-    all_metrics = {f"fold_{fold}": {} for fold in folds}
-    for fold in folds:
-        metrics_fold = train_and_eval(cfg, fold=fold, project_name=args.project)
-        all_metrics[f"fold_{fold}"] = metrics_fold
+    all_metrics = {}
+    for test_fold in folds:
+        all_metrics[f"fold_{test_fold}"] = {}
+        for val_fold in folds[:-1]:
+            metrics_fold = train_and_eval(cfg, test_fold=test_fold, val_fold=val_fold, project_name=args.project)
+            all_metrics[f"fold_{test_fold}"][f"fold_{val_fold}"] = metrics_fold
+
+            print(all_metrics)
 
     logger.info(all_metrics)
 

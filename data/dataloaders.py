@@ -7,14 +7,14 @@ from omegaconf import DictConfig
 from scripts.utils.str_to_class import str_to_class
 
 
-def get_dataloaders(cfg: DictConfig, fold: int = 0):
+def get_dataloaders(cfg: DictConfig, test_fold: int = 0, val_fold: int = 0):
     if cfg.dataset.transform.enable:
         transform = str_to_class(cfg.dataset.transform.name)(**cfg.dataset.transform.params)
     else:
         transform = None
-    train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train", transform=transform, fold=fold)
-    val_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="val", fold=fold)
-    # test_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="test",)
+    train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train", transform=transform, test_fold=test_fold, val_fold=val_fold,)
+    val_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="val", test_fold=test_fold, val_fold=val_fold)
+    test_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="test", test_fold=test_fold, val_fold=val_fold)
 
     # labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
     labels_train = train_dataset.labels
@@ -39,20 +39,20 @@ def get_dataloaders(cfg: DictConfig, fold: int = 0):
 
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=True)
 
-    # test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-    return {"train": train_dataloader, "val": val_dataloader}
+    return {"train": train_dataloader, "val": val_dataloader, "test": test_dataloader}
 
 
-def get_dataloaders_clips(cfg: DictConfig, fold: int = 0):
+def get_dataloaders_clips(cfg: DictConfig, test_fold: int = 0, val_fold: int = 0):
     if cfg.dataset.transform.enable:
         transform = str_to_class(cfg.dataset.transform.name)(**cfg.dataset.transform.params)
     else:
         transform = None
-    train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train", transform=transform, fold=fold, **cfg.dataset.params_clips)
+    train_dataset = str_to_class(cfg.dataset.name)(**cfg.dataset.params, mode="train", transform=transform, test_fold=test_fold, val_fold=val_fold, **cfg.dataset.params_clips)
     dataset_name = cfg.dataset.name.split("_")[0]
-    val_dataset = str_to_class(dataset_name)(**cfg.dataset.params, mode="val", fold=fold)
-    # test_dataset = str_to_class(dataset_name)(**cfg.dataset.params, mode="test", )
+    val_dataset = str_to_class(dataset_name)(**cfg.dataset.params, mode="val", test_fold=test_fold, val_fold=val_fold)
+    test_dataset = str_to_class(dataset_name)(**cfg.dataset.params, mode="test", test_fold=test_fold, val_fold=val_fold)
 
     # labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
     labels_train = train_dataset.labels
@@ -77,9 +77,9 @@ def get_dataloaders_clips(cfg: DictConfig, fold: int = 0):
 
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=True)
 
-    # test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-    return {"train": train_dataloader, "val": val_dataloader}
+    return {"train": train_dataloader, "val": val_dataloader, "test": test_dataloader}
 
 
 def collate_fn(batch):

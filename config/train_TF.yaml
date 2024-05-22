@@ -37,7 +37,7 @@ dataset:
         data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
         # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
         annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
-        num_folds: 10
+        num_folds: 8
     params_clips:
         sample_rate: 1
         clip_length: 720
@@ -95,7 +95,7 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
     # path: /local_storage/users/tibbe/models/FM/TimeFormer/
