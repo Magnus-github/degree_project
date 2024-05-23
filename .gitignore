@@ -4,3 +4,5 @@ model/
 wandb/
 *logs/
 *venv*/
+*.png
+*.pdf

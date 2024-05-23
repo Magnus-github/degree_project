@@ -1,0 +1,106 @@
+model:
+    name: scripts.FM_classification.model:TimeFormer
+    in_features: kinematics_vel # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
+    load_weights:
+        enable: false
+        path: model/FM_classification/STTransformer_overfit.pth
+    in_params:
+        joint_in_channels: 4
+        joint_hidden_channels: 16
+        num_encoder_layers: 1
+        num_heads: 2
+        num_joints: 4 # options: [14, 18]
+        clip_len: 375
+        clip_overlap: 0
+        num_classes: 2
+        dropout: 0.6
+        pool_method: scripts.FM_classification.model_utils:AvgPool
+    save_period: 0.1
+dataset:
+    name: data.datasetKI:KIDataset_dynamicClipSample
+    transform:
+        enable: false
+        name: data.augmentations:RandScale
+        params:
+            magnitude: 0.5 # [0, 1]
+            p: 0.9 # [0, 1]
+            class_agnostic: false
+    fps: 25
+    diff_step: 1
+    class_names: ['FM-', 'FM_abnormal', 'FM+']
+    joints: hands_and_feet # options: [hands, feet, hips, hands_and_feet, hands_feet_hips, all] 
+    mapping: {1: 0, 4: 0, 12: 1} # {'1': 0, '4': 1, '12': 2} or {'1': 0, '4': 0, '12': 1}
+    sampling: 
+        enable: true
+        method: oversampling # options: [oversampling, undersampling]
+    params:
+        data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
+        # data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
+        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        # annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
+        num_folds: 8
+    params_clips:
+        sample_rate: 1
+        clip_length: 750
+        max_overlap: 0
+hparams:
+    epochs: 400
+    batch_size: 24
+    validation_period: 1
+    early_stopping:
+        enable: false
+        after_epoch: 100
+        patience: 50
+        slope_threshold: 0.01
+        metric: val_loss
+    save_best_threshold: 0.5 # save model if val_loss is better than threshold
+    criterion: 
+        name: scripts.FM_classification.loss:CrossEntropyLoss
+        params: # only used for WeightedCrossEntropyLoss
+            weights: [2.5, 0.5] #[2.61538462, 1.61904762, 0.5] # label distribution: [13, 21, 68]; calc: (total/occurence)/num_classes
+    optimizer:
+        name: scripts.FM_classification.optimizer:AdamW
+        use_scheduler: true
+        params:
+            lr: 0.001
+            betas: [0.9, 0.999]
+            weight_decay: 0.01
+        params_sgd:
+            lr: 0.001
+            weight_decay: 0.0001
+    scheduler:
+        name: scripts.FM_classification.optimizer:CosineDecayWithWarmUpScheduler
+        params:
+            step_per_epoch: 6
+            init_warmup_lr: 0.0005
+            warm_up_steps: 300 # 50 epochs
+            max_lr: 0.001
+            min_lr: 0.0005
+            num_step_down: 2100 # 350 epochs
+            num_step_up: 0 # None (empty is none)
+            T_mul: 1
+            max_lr_decay: Exp
+            gamma: 0.5
+            min_lr_decay: Exp
+            alpha: 0.5
+        params_cyclic:
+            base_lr: 0.001
+            max_lr: 0.001
+            step_size_up: 400
+            step_size_down: 100
+            mode: triangular2
+        params_reduce_on_plateau:
+            factor: 0.25
+            patience: 10
+            threshold: 0.0001
+            threshold_mode: 'rel'
+logger:
+    name: wandb
+    enable: true
+outputs:
+    # path: /Midgard/Data/tibbe/models/FM
+    path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    # path: /Volumes/USB3/thesis/models/FM/TimeFormer/
+test:
+    enable: false
+    model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth
