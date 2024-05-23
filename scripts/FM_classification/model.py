@@ -176,18 +176,8 @@ class TimeFormer(torch.nn.Module):
         # split the sequence into subsequences of length t
         t = self.clip_len
         x = x.unfold(1, t, self.stride).permute(0,1,4,2,3) # [B, K, t, c, j]
-        # x = x[:, T%t:] # cut the sequence to be divisible by t
-        # K = T//t
-        # x = x.view(B, K, t, c, j)
         B, K, t, c, j = x.shape
         x = x.reshape(B*K,t,c*j)
-
-
-        # embed the joint dimension with CNN layer 
-        # x = self.cnn(x)
-        # x = F.sigmoid(x)
-        # x = self.dropout(x)
-        # x = x.view(B*K, t, -1)
 
         # temporal transformer
         BK, t, c_ = x.shape
@@ -197,11 +187,9 @@ class TimeFormer(torch.nn.Module):
         x = self.attention(x)
         x = self.dropout(x)
 
-        # x = x.reshape(B*K, -1)
 
         clip_cls = self.mlp(x)
 
-        # pool = nn.MaxPool1d(K)
         pool = str_to_class(self.pool_method)(K)
         vid_cls = clip_cls.view(B, K, -1).permute(0, 2, 1)
         vid_cls = pool(vid_cls).squeeze(dim=-1)
@@ -283,6 +271,7 @@ class SMNN(torch.nn.Module):
         self.fc = nn.Linear(in_channels, joint_hidden_channels)
         self.dropout = nn.Dropout(dropout)
         self.fc2 = nn.Linear(joint_hidden_channels, 2*joint_hidden_channels)
+        self.prelu = nn.PReLU()
         self.fc3 = nn.Linear(2*joint_hidden_channels, num_classes)
 
         self.clip_len = clip_len
@@ -299,7 +288,7 @@ class SMNN(torch.nn.Module):
         x = F.relu(x)
         x = self.dropout(x)
         x = self.fc2(x)
-        x = nn.PReLU()(x)
+        x = self.prelu(x)
         clip_cls = self.fc3(x).reshape(B, K, -1).permute(0, 2, 1)
 
         if self.pool_method is None:
@@ -316,9 +305,9 @@ class TimeConvNet(nn.Module):
     def __init__(self, joint_in_channels: int = 4,
                  joint_hidden_channels: int = 128,
                  num_joints: int = 14,
-                 kernel_size: int = 120,
-                 rel_stride: float = 0.5,
-                 clip_len: int = 360,
+                 kernel_size: int = 125,
+                 rel_stride: float = 0.2,
+                 clip_len: int = 375,
                  clip_overlap: int = 180,
                  num_classes: int = 2,
                  dropout: float = 0.2) -> None:

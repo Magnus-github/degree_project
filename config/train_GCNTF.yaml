@@ -10,8 +10,8 @@ model:
         num_encoder_layers: 2
         num_heads: 4
         num_joints: 14
-        clip_len: 250
-        clip_overlap: 125
+        clip_len: 375
+        clip_overlap: 0
         num_classes: 2
         dropout: 0.6
         pool_method: scripts.FM_classification.model_utils:AvgPool
@@ -34,18 +34,18 @@ dataset:
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        # data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
-        data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
-        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
-        annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
-        num_folds: 10
+        data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
+        # data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
+        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        # annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
+        num_folds: 8
     params_clips:
         sample_rate: 1
         clip_length: 750
-        max_overlap: 250
+        max_overlap: 0
 hparams:
     epochs: 400
-    batch_size: 8
+    batch_size: 4
     validation_period: 1
     early_stopping:
         enable: false
@@ -96,11 +96,11 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: false
+    enable: true
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    # path: /local_storage/users/tibbe/models/FM/TimeFormer/
-    path: /Volumes/USB3/thesis/models/FM/TimeFormer/
+    path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    # path: /Volumes/USB3/thesis/models/FM/TimeFormer/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth
