@@ -88,7 +88,7 @@ if __name__ == "__main__":
     logger.info(all_metrics)
 
     # save metrics
-    save_dir = "output/" + args.project
+    save_dir = "output/" + args.project + "_" + cfg.model.name.split(":")[-1]
     os.makedirs(save_dir, exist_ok=True)
     np.save(os.path.join(save_dir, "metrics.npy"), all_metrics, allow_pickle=True)
 

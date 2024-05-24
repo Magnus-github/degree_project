@@ -143,6 +143,8 @@ class Trainer:
                 return features[:,:,:2,:]
             elif name == "kinematics_vel":
                 return features[:,:,:4,:]
+            elif name == "kinematics_vel_only":
+                return features[:,:,2:4,:]
             elif name == "kinematics_acc":
                 return features[:,:,:6,:]
 
