@@ -54,6 +54,14 @@ def get_dataloaders_clips(cfg: DictConfig, test_fold: int = 0, val_fold: int = 0
     val_dataset = str_to_class(dataset_name)(**cfg.dataset.params, mode="val", test_fold=test_fold, val_fold=val_fold)
     test_dataset = str_to_class(dataset_name)(**cfg.dataset.params, mode="test", test_fold=test_fold, val_fold=val_fold)
 
+    for f in train_dataset.data:
+        for fv in val_dataset.data:
+            if f == fv:
+                print("WHAAAT", f, fv)
+        for ft in test_dataset.data:
+            if f == ft:
+                print("THIS IS A CATASTROPHE", f, ft)
+
     # labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
     labels_train = train_dataset.labels
     y_train = [cfg.dataset.mapping[label] for label in labels_train]

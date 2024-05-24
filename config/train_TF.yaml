@@ -34,10 +34,10 @@ dataset:
         enable: true
         method: oversampling # options: [oversampling, undersampling]
     params:
-        data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
-        # data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
-        annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
-        # annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
+        # data_folder: /Midgard/Data/tibbe/datasets/own/np_poses_corrected/
+        data_folder:  /Volumes/USB3/thesis/data/np_poses_corrected/
+        # annotations_path: /Midgard/Data/tibbe/datasets/own/annotations.csv
+        annotations_path: /Volumes/USB3/thesis/data/annotations_orig.csv
         num_folds: 8
     params_clips:
         sample_rate: 1
@@ -96,11 +96,11 @@ hparams:
             threshold_mode: 'rel'
 logger:
     name: wandb
-    enable: true
+    enable: false
 outputs:
     # path: /Midgard/Data/tibbe/models/FM
-    path: /local_storage/users/tibbe/models/FM/TimeFormer/
-    # path: /Volumes/USB3/thesis/models/FM/TimeFormer/
+    # path: /local_storage/users/tibbe/models/FM/TimeFormer/
+    path: /Volumes/USB3/thesis/models/FM/TimeFormer/
 test:
     enable: false
     model_weights: /Midgard/Data/tibbe/models/FM/2024-04-11_22:21:11_charmed-grass-92/model/STTransformer_best.pth

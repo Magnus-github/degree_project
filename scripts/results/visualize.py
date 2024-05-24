@@ -10,44 +10,75 @@ def inspect(dir: str):
     folders = [f for f in folders if 'FM_classification' in f]
 
     dataframes = []
-    means = []
+    val_means = []
+    test_means = []
     names = []
     for folder in folders:
         metrics = np.load(f"{dir}/{folder}/metrics.npy", allow_pickle=True).item()
         print(f"Folder: {folder}")
-        print(metrics['fold_0']['best']['val_f1'])
 
-        acc = {'Accuracy': [metrics[f]['best']['val_accuracy'] for f in metrics.keys()]}
-        f1_score_aberrant = {'F1-score aberrant': [metrics[f]['best']['val_f1'][0] for f in metrics.keys()]}
-        f1_score_normal = {'F1-score normal': [metrics[f]['best']['val_f1'][1] for f in metrics.keys()]}
         
-        df = pd.DataFrame({**acc, **f1_score_aberrant, **f1_score_normal})
+        for test_fold in metrics.keys():
+            metrics[test_fold]['average_val_acc'] = np.mean([metrics[test_fold][f"val_fold_{val_fold}"]['final_val']['accuracy'] for val_fold in range(7)])
+            metrics[test_fold]['average_val_f1'] = np.mean([metrics[test_fold][f"val_fold_{val_fold}"]['final_val']['f1_scores'] for val_fold in range(7)], axis=0)
+            metrics[test_fold]['average_val_confusion_matrix'] = np.mean([metrics[test_fold][f"val_fold_{val_fold}"]['final_val']['confusion_matrix'] for val_fold in range(7)], axis=0)
+            metrics[test_fold]['average_test_acc'] = np.mean([metrics[test_fold][f"val_fold_{val_fold}"]['test']['accuracy'] for val_fold in range(7)])
+            metrics[test_fold]['average_test_f1'] = np.mean([metrics[test_fold][f"val_fold_{val_fold}"]['test']['f1_scores'] for val_fold in range(7)], axis=0)
+            metrics[test_fold]['average_test_confusion_matrix'] = np.mean([metrics[test_fold][f"val_fold_{val_fold}"]['test']['confusion_matrix'] for val_fold in range(7)], axis=0)
+
+        avg_val_accs = {'Validation Accuracy': [metrics[f]['average_val_acc'] for f in metrics.keys()]}
+        avg_val_f1_aberrant = {'Validation F1-score aberrant': [metrics[f]['average_val_f1'][0] for f in metrics.keys()]}
+        avg_val_f1_normal = {'Validation F1-score normal': [metrics[f]['average_val_f1'][1] for f in metrics.keys()]}
+        avg_test_accs = {'Test Accuracy': [metrics[f]['average_test_acc'] for f in metrics.keys()]}
+        avg_test_f1_aberrant = {'Test F1-score aberrant': [metrics[f]['average_test_f1'][0] for f in metrics.keys()]}
+        avg_test_f1_normal = {'Test F1-score normal': [metrics[f]['average_test_f1'][1] for f in metrics.keys()]}
+        
+        val_metrics_df = pd.DataFrame({**avg_val_accs, **avg_val_f1_aberrant, **avg_val_f1_normal})
+        test_metrics_df = pd.DataFrame({**avg_test_accs, **avg_test_f1_aberrant, **avg_test_f1_normal})
 
         figure = plt.figure()
-        boxplot = pd.plotting.boxplot(df, showmeans=True, showfliers=False)
+        boxplot_val = pd.plotting.boxplot(val_metrics_df, showmeans=True, showfliers=False)
         # plt.xticks(rotation=45)
-        plt.title(folder)
-        plt.savefig(f"{dir}/{folder}/boxplot.pdf")
+        plt.title(f"{folder} Validation Metrics")
+        plt.savefig(f"{dir}/{folder}/boxplot_val.pdf")
+        figure = plt.figure()
+        boxplot_test = pd.plotting.boxplot(test_metrics_df, showmeans=True, showfliers=False)
+        plt.title(f"{folder} Test Metrics")
+        plt.savefig(f"{dir}/{folder}/boxplot_test.pdf")
 
-        with open(f"{dir}/{folder}/table.txt", "w") as f:
-            f.write(df.to_latex(index=False,
+        with open(f"{dir}/{folder}/val_table.txt", "w") as f:
+            f.write(val_metrics_df.to_latex(index=False,
+                  formatters={"name": str.upper},
+                  float_format="{:.2f}".format,))
+        
+        with open(f"{dir}/{folder}/test_table.txt", "w") as f:
+            f.write(test_metrics_df.to_latex(index=False,
                   formatters={"name": str.upper},
                   float_format="{:.2f}".format,))
             
-        means.append(df.mean())
+        val_means.append(val_metrics_df.mean())
+        test_means.append(test_metrics_df.mean())
         names.append(folder)
 
-        dataframes.append(df)
 
-    means = pd.DataFrame(means)
-    means.index = names
-    print(means)
-    with open(f"{dir}/all_experiments.txt", "w") as f:
-        f.write(means.to_latex(formatters={"name": str.upper},
+    val_means_df = pd.DataFrame(val_means)
+    val_means_df.index = names
+    print(val_means_df)
+    with open(f"{dir}/all_experiments_val.txt", "w") as f:
+        f.write(val_means_df.to_latex(formatters={"name": str.upper},
+                  float_format="{:.2f}".format,))
+    
+    test_means_df = pd.DataFrame(test_means)
+    test_means_df.index = names
+    print(test_means_df)
+    with open(f"{dir}/all_experiments_test.txt", "w") as f:
+        f.write(test_means_df.to_latex(formatters={"name": str.upper},
                   float_format="{:.2f}".format,))
 
 
 
     
 if __name__ == "__main__":
-    inspect("output/")
+    inspect("output/SMNN")
+
+

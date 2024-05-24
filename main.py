@@ -71,7 +71,7 @@ def train_and_eval(cfg: DictConfig, test_fold: int = 0, val_fold: int = 0, proje
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/train_GCNTF.yaml", help="Path to config file.")
+    parser.add_argument("--config", type=str, default="config/train_TF.yaml", help="Path to config file.")
     parser.add_argument("--project", type=str, default="FM_classification", help="Wandb project name.")
     args = parser.parse_args()
     cfg = OmegaConf.load(args.config)
