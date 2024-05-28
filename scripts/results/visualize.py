@@ -7,7 +7,7 @@ import os
 
 def inspect(dir: str):
     folders = os.listdir(dir)
-    folders = [f for f in folders if 'FM_classification' in f]
+    folders = [f for f in folders if 'FM_cls' in f]
 
     dataframes = []
     val_means = []
@@ -70,7 +70,7 @@ def inspect(dir: str):
     
     test_means_df = pd.DataFrame(test_means)
     test_means_df.index = names
-    print(test_means_df)
+
     with open(f"{dir}/all_experiments_test.txt", "w") as f:
         f.write(test_means_df.to_latex(formatters={"name": str.upper},
                   float_format="{:.2f}".format,))

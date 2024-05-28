@@ -345,27 +345,34 @@ class TimeConvNet(nn.Module):
         return vid_cls
 
 
-        
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
 if __name__ == "__main__":
     example = torch.randn(20, 240*3, 2, 14, 14)
     cfg = {"in_params":
             {
-               "joint_in_channels": 7,
-                "joint_hidden_channels": 16,
-                "num_encoder_layers": 1,
-                "num_joints": 18,
-                "clip_len": 480,
+                "joint_in_channels": 4,
+                "joint_hidden_channels": 4,
+                "num_encoder_layers": 2,
+                "num_heads": 4,
+                "num_joints": 14,
+                "clip_len": 375,
+                "clip_overlap": 0,
                 "num_classes": 2,
                 "dropout": 0.6,
-                "pool_method": "scripts.FM_classification.model_utils:MaxPool"
                 }
             }
 
-    # model = TimeFormer(**cfg["in_params"])
+    model = TimeFormer(**cfg["in_params"])
+    print(f"TimeFormer has {count_parameters(model)} parameters")
+    model = GCN_TimeFormer(**cfg["in_params"])
+    print(f"GCN_TimeFormer has {count_parameters(model)} parameters")
     model = TimeConvNet()
-    # model = SMNN()
+    print(f"TimeConvNet has {count_parameters(model)} parameters")
+    model = SMNN()
+    print(f"SMNN has {count_parameters(model)} parameters")
 
     example = torch.randn(1, 4210, 4, 14)
 
