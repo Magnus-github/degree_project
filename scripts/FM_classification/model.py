@@ -345,9 +345,6 @@ class TimeConvNet(nn.Module):
         return vid_cls
 
 
-        
-
-
 if __name__ == "__main__":
     example = torch.randn(20, 240*3, 2, 14, 14)
     cfg = {"in_params":
@@ -363,9 +360,10 @@ if __name__ == "__main__":
                 }
             }
 
-    # model = TimeFormer(**cfg["in_params"])
+    model = TimeFormer(**cfg["in_params"])
+    model = GCN_TimeFormer(**cfg["in_params"])
     model = TimeConvNet()
-    # model = SMNN()
+    model = SMNN()
 
     example = torch.randn(1, 4210, 4, 14)
 

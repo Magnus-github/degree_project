@@ -13,4 +13,4 @@ echo "Starting job ${SLURM_JOB_ID} on ${SLURMD_NODENAME}"
 nvidia-smi
 . ~/miniconda3/etc/profile.d/conda.sh
 conda activate /Midgard/home/tibbe/mambaforge/envs/openpose
-python main.py --config config/train_TF.yaml --project ${PROJECT_NAME}
+python main.py --config ${CONFIG} --project ${PROJECT_NAME}

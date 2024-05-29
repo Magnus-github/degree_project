@@ -1,6 +1,6 @@
 model:
     name: scripts.FM_classification.model:TimeFormer
-    in_features: kinematics_vel_only # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
+    in_features: kinematics_vel # options: [distance_mat, kinematics(pos, vel, acc, tot_dist)]
     load_weights:
         enable: false
         path: model/FM_classification/STTransformer_overfit.pth
