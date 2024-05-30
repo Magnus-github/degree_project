@@ -187,7 +187,6 @@ class TimeFormer(torch.nn.Module):
         x = self.attention(x)
         x = self.dropout(x)
 
-
         clip_cls = self.mlp(x)
 
         pool = str_to_class(self.pool_method)(K)

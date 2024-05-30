@@ -36,10 +36,10 @@ class KIDataset(Dataset):
 
         if mode == "train":
             self.data = [train_val_data[i] for i in train_idx]
-            self.labels = [train_val_data[i] for i in train_idx]
+            self.labels = [train_val_labels[i] for i in train_idx]
         if mode == "val":
             self.data = [train_val_data[i] for i in val_idx]
-            self.labels = [train_val_data[i] for i in val_idx]
+            self.labels = [train_val_labels[i] for i in val_idx]
         if mode == "test":
             self.data = [all_data[i] for i in test_idx]
             self.labels = [all_labels[i] for i in test_idx]
@@ -134,6 +134,10 @@ class KIDataset_dynamicClipSample(KIDataset):
 
         label = torch.tensor([label]*pose_clips.shape[0])
 
+        if pose_file  == "ID_0101_3.npy":
+            print(pose_file)
+            print(pose_sequence.shape, label)
+            print(pose_clips.shape, label)
         return pose_clips, label
 
 
