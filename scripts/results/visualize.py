@@ -81,7 +81,7 @@ def inspect(dir: str):
 if __name__ == "__main__":
     inspect("output/TimeFormer")
     inspect("output/SMNN")
-    # inspect("output/TimeConvNet")
-    # inspect("output/GCN_TimeFormer")
+    inspect("output/TimeConvNet")
+    inspect("output/GCN_TimeFormer")
 
 
