@@ -70,7 +70,10 @@ def get_dataloaders_clips(cfg: DictConfig, test_fold: int = 0, val_fold: int = 0
 
     # labels_train = [train_dataset.labels[train_dataset.ids[int(file.split("_")[1])]] for file in train_dataset.data]
     labels_train = train_dataset.labels
-    mapping = {1: 0, 4: 1, 12: 2}
+    if len(set(labels_train)) == 2:
+        mapping = {1: 0, 4: 0, 12: 1}
+    else:
+        mapping = {1: 0, 4: 1, 12: 2}
     y_train = [mapping[label] for label in labels_train]
     if cfg.dataset.sampling.enable:
         class_sample_count = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
@@ -195,4 +198,11 @@ def get_label_distribution(cfg: DictConfig, test_fold: int = 0, val_fold: int = 
 if __name__ == "__main__":
     from omegaconf import OmegaConf
     cfg = OmegaConf.load("config/train_TF.yaml")
-    get_label_distribution(cfg)
+    # get_label_distribution(cfg)
+
+    dls = get_dataloaders_clips(cfg)
+    labels = []
+    for i, (pose_sequence, label) in enumerate(dls["train"]):
+        labels.append(label)
+    
+    print(labels)

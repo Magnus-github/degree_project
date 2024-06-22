@@ -22,6 +22,11 @@ class KIDataset(Dataset):
         all_data = os.listdir(self.data_folder)
         all_labels = [labels[self.ids[int(file.split("_")[1])]] for file in all_data]
 
+        if True: # Remove abnormal samples
+            abnormal_indices = [i for i, label in enumerate(all_labels) if label == 4]
+            all_data = [all_data[i] for i in range(len(all_data)) if i not in abnormal_indices]
+            all_labels = [all_labels[i] for i in range(len(all_labels)) if i not in abnormal_indices]
+
         # Split data into train/val and test
         skf = StratifiedKFold(n_splits=num_folds, random_state=seed, shuffle=True)
         splits = list(skf.split(all_data, all_labels))
@@ -132,6 +137,10 @@ class KIDataset_dynamicClipSample(KIDataset):
         assert n_frames >= self.clip_length, f"Clip length {self.clip_length} is longer than sequence length {n_frames}."
         pose_clips = torch.tensor(pose_sequence).unfold(0, self.clip_length, self.stride).permute(0, 3, 1, 2).contiguous()
 
+        if label == 12:
+            idx = random.sample(range(max(2,pose_clips.size(0))),k=2)
+            pose_clips = pose_clips[idx]
+
         label = torch.tensor([label]*pose_clips.shape[0])
 
         if pose_file  == "ID_0101_3.npy":
@@ -156,6 +165,9 @@ if __name__ == "__main__":
     # annotations_path = "/Users/magnusrubentibbe/Dropbox/Magnus_Ruben_TIBBE/Uni/Master_KTH/Thesis/code/data/dataset_KI/annotations.csv"
     d_train = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="train")
     d_val = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="val")
+    d_all = KIDataset(data_folder=data_folder, annotations_path=annotations_path, mode="all")
+
+    dl_all = torch.utils.data.DataLoader(d_all, batch_size=1)
 
 
 
@@ -176,7 +188,7 @@ if __name__ == "__main__":
     t = start
     label_lst  = []
     seq_lens = []
-    for i, (pose_sequence, label) in enumerate(tqdm(dataloader)):
+    for i, (pose_sequence, label) in enumerate(tqdm(dl_all)):
         B, T, J, C = pose_sequence.shape
         label_lst.append(mapping[label[0]])
         seq_lens.append(T)

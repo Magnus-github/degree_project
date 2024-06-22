@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import rc
 
 import omegaconf
 
@@ -8,27 +9,37 @@ from optimizer import CosineDecayWithWarmUpScheduler
 import sys
 sys.path.append(".")
 from data.datasetKI import KIDataset
+from scripts.utils.str_to_class import str_to_class
 
 
+rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+rc('text', usetex=True)
 
 def plot_lr():
-    cfg = omegaconf.OmegaConf.load("/Midgard/home/tibbe/thesis/degree_project/config/train_TF.yaml")
+    cfg = omegaconf.OmegaConf.load("config/train_TF.yaml")
 
-    optim = torch.optim.Adam([torch.tensor(1.0)], lr=1e-3)
+    # optim = torch.optim.Adam([torch.tensor(1.0)], lr=1e-3)
+    optimizer = str_to_class(cfg.hparams.optimizer.name)([torch.tensor(1.0)], **cfg.hparams.optimizer.params)
+    scheduler = str_to_class(cfg.hparams.scheduler.name)(optimizer, **cfg.hparams.scheduler.params)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim, T_0=10, T_mult=2)
-    scheduler = CosineDecayWithWarmUpScheduler(optim, **cfg.hparams.scheduler.params)
+    # scheduler = CosineDecayWithWarmUpScheduler(optim, **cfg.hparams.scheduler.params)
 
-    for i in range(300):
-        for j in range(120):
-            optim.step()
+    for i in range(400):
+        for j in range(6):
+            optimizer.step()
             scheduler.step()
             
 
     print("Plotting...")
     print(len(scheduler.lr_list))
-    plt.figure()
+    plt.figure(figsize=(15, 10))
     plt.plot(scheduler.lr_list)
-    plt.savefig("cosine_decay.png")
+    plt.xlabel("Step", fontsize=45)
+    plt.ylabel("Learning rate", fontsize=45)
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=30)
+    plt.tight_layout()
+    plt.savefig("cosine_decay.pdf")
 
 
 
@@ -102,4 +113,5 @@ def compare_classes(cfg: omegaconf.DictConfig):
 
 if __name__ == "__main__":
     cfg = omegaconf.OmegaConf.load("config/train_TF.yaml")
-    compare_classes(cfg)
+    # compare_classes(cfg)
+    plot_lr()
